@@ -1,0 +1,61 @@
+[package]
+name = "paraoxidizer"
+version = "0.1.0"
+edition = "2021"
+authors = ["Adriteyo Das <das.adriteyo26@gmail.com>"]
+description = "Parameter Oxidizer — a Rust-native LLM quantization, optimization, verification, and inference toolkit"
+license = "GPL-3.0-or-later"
+readme = "README.md"
+repository = "https://github.com/tryhard-26/ParaOxidizer"
+homepage = "https://github.com/tryhard-26/ParaOxidizer"
+keywords = ["llm", "quantization", "inference", "optimization", "security"]
+categories = ["command-line-utilities", "science"]
+
+[workspace]
+members = [
+    "crates/paraoxidizer-core",
+    "crates/paraoxidizer-format",
+    "crates/paraoxidizer-quant",
+    "crates/paraoxidizer-calibration",
+    "crates/paraoxidizer-optimizer",
+    "crates/paraoxidizer-security",
+    "crates/paraoxidizer-runtime",
+    "crates/paraoxidizer-serve",
+    "crates/paraoxidizer-bench",
+    "crates/paraoxidizer-cli",
+    "crates/paraoxidizer-py",
+]
+resolver = "2"
+
+[dependencies]
+paraoxidizer-core = { path = "crates/paraoxidizer-core", version = "0.1.0" }
+paraoxidizer-format = { path = "crates/paraoxidizer-format", version = "0.1.0" }
+paraoxidizer-quant = { path = "crates/paraoxidizer-quant", version = "0.1.0" }
+paraoxidizer-calibration = { path = "crates/paraoxidizer-calibration", version = "0.1.0" }
+paraoxidizer-optimizer = { path = "crates/paraoxidizer-optimizer", version = "0.1.0" }
+paraoxidizer-security = { path = "crates/paraoxidizer-security", version = "0.1.0" }
+paraoxidizer-runtime = { path = "crates/paraoxidizer-runtime", version = "0.1.0" }
+paraoxidizer-serve = { path = "crates/paraoxidizer-serve", version = "0.1.0" }
+paraoxidizer-bench = { path = "crates/paraoxidizer-bench", version = "0.1.0" }
+paraoxidizer-cli = { path = "crates/paraoxidizer-cli", version = "0.1.0" }
+
+clap = { version = "4.5", features = ["derive", "cargo", "env"] }
+tokio = { version = "1.39", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1.0"
+
+[dev-dependencies]
+tempfile = "3.10"
+half = "2.4"
+safetensors = "0.4"
+serde_json = "1.0"
+axum = "0.7"
+
+[[bin]]
+name = "pox"
+path = "src/bin/pox.rs"
+
+[[bin]]
+name = "paraoxidizer"
+path = "src/bin/paraoxidizer.rs"
