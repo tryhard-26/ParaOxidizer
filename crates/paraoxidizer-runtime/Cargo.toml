@@ -1,0 +1,26 @@
+[package]
+name = "paraoxidizer-runtime"
+version = "0.1.0"
+edition = "2021"
+authors = ["Adriteyo Das <das.adriteyo26@gmail.com>"]
+description = "Lightweight quantized Transformer inference engine, Metal compute kernels, and tokenizer"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/tryhard-26/ParaOxidizer"
+homepage = "https://github.com/tryhard-26/ParaOxidizer"
+
+[dependencies]
+paraoxidizer-core = { path = "../paraoxidizer-core", version = "0.1.0" }
+paraoxidizer-format = { path = "../paraoxidizer-format", version = "0.1.0" }
+paraoxidizer-quant = { path = "../paraoxidizer-quant", version = "0.1.0" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rand = "0.8"
+half = "2.4"
+thiserror = "1.0"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+metal = { version = "0.33", optional = true }
+
+[features]
+default = ["metal"]
+metal = ["dep:metal"]
