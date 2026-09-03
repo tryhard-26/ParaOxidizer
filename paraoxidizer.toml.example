@@ -1,0 +1,35 @@
+# ParaOxidizer Configuration (paraoxidizer.toml)
+# Run with: pox build paraoxidizer.toml
+
+[model]
+source = "models/llama-3-8b"
+architecture = "Llama"
+output = "artifacts/llama-3-8b-optimized.pox"
+
+[calibration]
+dataset = "datasets/agentic_traces.jsonl"
+profile = "agentic"
+samples = 512
+sequence_length = 1024
+
+[quantization]
+algorithm = "min-max"
+allowed_precisions = ["INT4", "INT8", "FP16"]
+group_sizes = [32, 64, 128, 256]
+outlier_policy = "automatic"
+
+[optimization]
+memory_limit = "6GB"
+latency_limit = "50ms"
+quality_floor = 98.5
+target_hardware = "auto"
+
+[security]
+verify_source = true
+require_signature = false
+artifact_integrity = true
+
+[runtime]
+backend = "auto"
+context = 4096
+batching = 1
