@@ -1,0 +1,32 @@
+[package]
+name = "paraoxidizer-bench"
+version = "0.1.0"
+edition = "2021"
+authors = ["Adriteyo Das <das.adriteyo26@gmail.com>"]
+description = "Benchmarking suite for ParaOxidizer inference speed, latency percentiles, and memory"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/tryhard-26/ParaOxidizer"
+homepage = "https://github.com/tryhard-26/ParaOxidizer"
+
+[dependencies]
+paraoxidizer-core = { path = "../paraoxidizer-core", version = "0.1.0" }
+paraoxidizer-runtime = { path = "../paraoxidizer-runtime", version = "0.1.0" }
+paraoxidizer-format = { path = "../paraoxidizer-format", version = "0.1.0" }
+paraoxidizer-quant = { path = "../paraoxidizer-quant", version = "0.1.0" }
+paraoxidizer-security = { path = "../paraoxidizer-security", version = "0.1.0" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+comfy-table = "7.1"
+colored = "2.1"
+thiserror = "1.0"
+half = { version = "2.4", features = ["serde"] }
+tempfile = "3.10"
+sha2 = "0.10"
+rand = "0.8"
+hex = "0.4"
+
+[[bin]]
+name = "pox-bench"
+path = "src/bin/pox_bench.rs"
+
+
