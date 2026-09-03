@@ -1,0 +1,23 @@
+[package]
+name = "paraoxidizer-serve"
+version = "0.1.0"
+edition = "2021"
+authors = ["Adriteyo Das <das.adriteyo26@gmail.com>"]
+description = "OpenAI-compatible HTTP server and Prometheus metrics for ParaOxidizer"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/tryhard-26/ParaOxidizer"
+homepage = "https://github.com/tryhard-26/ParaOxidizer"
+
+[dependencies]
+paraoxidizer-core = { path = "../paraoxidizer-core", version = "0.1.0" }
+paraoxidizer-runtime = { path = "../paraoxidizer-runtime", version = "0.1.0" }
+axum = { version = "0.7", features = ["tokio", "http1", "json"] }
+tokio = { version = "1.39", features = ["full"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio-stream = "0.1"
+futures = "0.3"
+tracing = "0.1"
+thiserror = "1.0"
