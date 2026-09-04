@@ -355,9 +355,9 @@ impl PoxFile {
     /// Verify complete internal SHA-256 integrity of all tensors
     pub fn verify_integrity(&self) -> Result<()> {
         for meta in &self.tensors {
-            let data = self
-                .get_tensor_data(&meta.name)
-                .ok_or_else(|| PoxError::Format(format!("Missing data for tensor {}", meta.name)))?;
+            let data = self.get_tensor_data(&meta.name).ok_or_else(|| {
+                PoxError::Format(format!("Missing data for tensor {}", meta.name))
+            })?;
             let mut hasher = Sha256::new();
             hasher.update(data);
             if meta.scale_len > 0 {

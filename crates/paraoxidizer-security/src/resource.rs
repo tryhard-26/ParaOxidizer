@@ -42,12 +42,7 @@ impl ResourceLimits {
         Ok(())
     }
 
-    pub fn validate_tensor_bounds(
-        &self,
-        offset: u64,
-        len: u64,
-        file_size: u64,
-    ) -> Result<()> {
+    pub fn validate_tensor_bounds(&self, offset: u64, len: u64, file_size: u64) -> Result<()> {
         let end = offset.checked_add(len).ok_or_else(|| {
             PoxError::Security("Arithmetic overflow calculating tensor boundaries".into())
         })?;

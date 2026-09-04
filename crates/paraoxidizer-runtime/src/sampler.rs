@@ -70,7 +70,13 @@ impl Sampler {
         }
 
         // 3. Softmax with numerical stability
-        let max_l = logits.iter().cloned().fold(f32::NEG_INFINITY, |a, b| if b.is_finite() { a.max(b) } else { a });
+        let max_l = logits.iter().cloned().fold(f32::NEG_INFINITY, |a, b| {
+            if b.is_finite() {
+                a.max(b)
+            } else {
+                a
+            }
+        });
         let max_l = if max_l.is_finite() { max_l } else { 0.0 };
         let mut sum_exp = 0.0f32;
         for l in logits.iter_mut() {

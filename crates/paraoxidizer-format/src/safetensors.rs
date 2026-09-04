@@ -47,6 +47,38 @@ impl SafeTensorsModel {
                         .collect();
                     (DType::BF16, floats)
                 }
+                StDtype::U8 => {
+                    let floats: Vec<f32> = raw_data.iter().map(|&b| b as f32).collect();
+                    (DType::F32, floats)
+                }
+                StDtype::I8 => {
+                    let floats: Vec<f32> = raw_data.iter().map(|&b| (b as i8) as f32).collect();
+                    (DType::F32, floats)
+                }
+                StDtype::I32 => {
+                    let floats: Vec<f32> = raw_data
+                        .chunks_exact(4)
+                        .map(|c| i32::from_le_bytes([c[0], c[1], c[2], c[3]]) as f32)
+                        .collect();
+                    (DType::F32, floats)
+                }
+                StDtype::I64 => {
+                    let floats: Vec<f32> = raw_data
+                        .chunks_exact(8)
+                        .map(|c| {
+                            i64::from_le_bytes([c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]])
+                                as f32
+                        })
+                        .collect();
+                    (DType::F32, floats)
+                }
+                StDtype::BOOL => {
+                    let floats: Vec<f32> = raw_data
+                        .iter()
+                        .map(|&b| if b != 0 { 1.0 } else { 0.0 })
+                        .collect();
+                    (DType::F32, floats)
+                }
                 other => {
                     return Err(PoxError::Format(format!(
                         "Unsupported SafeTensors dtype: {:?}",

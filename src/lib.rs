@@ -15,13 +15,13 @@
 //! - [`bench`]: Standardized inference and quality benchmarking harness.
 //! - [`cli`]: Complete CLI commands for the `pox` / `paraoxidizer` binary.
 
+pub use paraoxidizer_bench as bench;
+pub use paraoxidizer_calibration as calibration;
+pub use paraoxidizer_cli as cli;
 pub use paraoxidizer_core as core;
 pub use paraoxidizer_format as format;
-pub use paraoxidizer_quant as quant;
-pub use paraoxidizer_calibration as calibration;
 pub use paraoxidizer_optimizer as optimizer;
-pub use paraoxidizer_security as security;
+pub use paraoxidizer_quant as quant;
 pub use paraoxidizer_runtime as runtime;
+pub use paraoxidizer_security as security;
 pub use paraoxidizer_serve as serve;
-pub use paraoxidizer_bench as bench;
-pub use paraoxidizer_cli as cli;

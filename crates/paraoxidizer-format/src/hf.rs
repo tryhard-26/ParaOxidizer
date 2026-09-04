@@ -130,24 +130,35 @@ impl HfModel {
         let safetensors_file = cache_dir.join("model.safetensors");
 
         if config_file.exists() && safetensors_file.exists() {
-            println!("Using cached Hugging Face repository at {}", cache_dir.display());
+            println!(
+                "Using cached Hugging Face repository at {}",
+                cache_dir.display()
+            );
             return Ok(cache_dir);
         }
 
-        println!("Fetching Hugging Face repository '{}' from https://huggingface.co/{}...", repo_id, repo_id);
+        println!(
+            "Fetching Hugging Face repository '{}' from https://huggingface.co/{}...",
+            repo_id, repo_id
+        );
 
         // 1. Download config.json
         let config_url = format!("https://huggingface.co/{}/raw/main/config.json", repo_id);
-        let resp = ureq::get(&config_url)
-            .call()
-            .map_err(|e| PoxError::Format(format!("Failed to fetch config.json from Hugging Face Hub: {e}")))?;
+        let resp = ureq::get(&config_url).call().map_err(|e| {
+            PoxError::Format(format!(
+                "Failed to fetch config.json from Hugging Face Hub: {e}"
+            ))
+        })?;
 
         let mut config_out = File::create(&config_file)?;
         let mut reader = resp.into_reader();
         std::io::copy(&mut reader, &mut config_out)?;
 
         // 2. Try downloading model.safetensors
-        let st_url = format!("https://huggingface.co/{}/resolve/main/model.safetensors", repo_id);
+        let st_url = format!(
+            "https://huggingface.co/{}/resolve/main/model.safetensors",
+            repo_id
+        );
         let st_resp = ureq::get(&st_url).call();
 
         match st_resp {
@@ -159,10 +170,15 @@ impl HfModel {
             }
             Err(_) => {
                 // Try downloading model.safetensors.index.json
-                let index_url = format!("https://huggingface.co/{}/raw/main/model.safetensors.index.json", repo_id);
-                let idx_resp = ureq::get(&index_url)
-                    .call()
-                    .map_err(|e| PoxError::Format(format!("Could not find model.safetensors or index on Hugging Face: {e}")))?;
+                let index_url = format!(
+                    "https://huggingface.co/{}/raw/main/model.safetensors.index.json",
+                    repo_id
+                );
+                let idx_resp = ureq::get(&index_url).call().map_err(|e| {
+                    PoxError::Format(format!(
+                        "Could not find model.safetensors or index on Hugging Face: {e}"
+                    ))
+                })?;
 
                 let index_file = cache_dir.join("model.safetensors.index.json");
                 let mut idx_out = File::create(&index_file)?;
@@ -182,7 +198,8 @@ impl HfModel {
                     let shard_file = cache_dir.join(&shard);
                     if !shard_file.exists() {
                         println!("Downloading shard {}...", shard);
-                        let shard_url = format!("https://huggingface.co/{}/resolve/main/{}", repo_id, shard);
+                        let shard_url =
+                            format!("https://huggingface.co/{}/resolve/main/{}", repo_id, shard);
                         let s_resp = ureq::get(&shard_url).call().map_err(|e| {
                             PoxError::Format(format!("Failed to download shard {}: {}", shard, e))
                         })?;
@@ -194,7 +211,10 @@ impl HfModel {
             }
         }
 
-        println!("Successfully downloaded and cached repository to {}", cache_dir.display());
+        println!(
+            "Successfully downloaded and cached repository to {}",
+            cache_dir.display()
+        );
         Ok(cache_dir)
     }
 
@@ -205,7 +225,9 @@ impl HfModel {
 
         let effective_path = if path_ref.exists() {
             path_ref.to_path_buf()
-        } else if path_str.starts_with("hf://") || (path_str.contains('/') && !path_str.starts_with('.') && !path_str.starts_with('/')) {
+        } else if path_str.starts_with("hf://")
+            || (path_str.contains('/') && !path_str.starts_with('.') && !path_str.starts_with('/'))
+        {
             let repo_id = path_str.trim_start_matches("hf://");
             Self::download_from_hub(repo_id)?
         } else {

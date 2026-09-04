@@ -1,10 +1,6 @@
 use crate::sampler::{Sampler, SamplerConfig};
 use crate::tokenizer::PoxTokenizer;
-use paraoxidizer_core::{
-    arch::ModelConfig,
-    error::Result,
-    tensor::DType,
-};
+use paraoxidizer_core::{arch::ModelConfig, error::Result, tensor::DType};
 use paraoxidizer_format::PoxFile;
 use paraoxidizer_quant::kernels::{gemv_int4, gemv_int8};
 use paraoxidizer_quant::outlier::SparseOutlierTable;
@@ -90,13 +86,19 @@ impl PoxEngine {
 
         if let Some(t_idx) = self.file.tensor_map.get("model.embed_tokens.weight") {
             let meta = &self.file.tensors[*t_idx];
-            let embed_data = self.file.get_tensor_data("model.embed_tokens.weight").unwrap();
+            let embed_data = self
+                .file
+                .get_tensor_data("model.embed_tokens.weight")
+                .unwrap();
             match meta.dtype {
                 DType::F16 => {
                     let row_bytes = hidden_size * 2;
                     let start = tok_idx * row_bytes;
                     if start + row_bytes <= embed_data.len() {
-                        for (i, chunk) in embed_data[start..start + row_bytes].chunks_exact(2).enumerate() {
+                        for (i, chunk) in embed_data[start..start + row_bytes]
+                            .chunks_exact(2)
+                            .enumerate()
+                        {
                             if i < hidden_size {
                                 x[i] = half::f16::from_le_bytes([chunk[0], chunk[1]]).to_f32();
                             }
@@ -104,10 +106,20 @@ impl PoxEngine {
                     }
                 }
                 DType::I8 => {
-                    let scale_data = self.file.get_scale_data("model.embed_tokens.weight").unwrap_or(&[]);
+                    let scale_data = self
+                        .file
+                        .get_scale_data("model.embed_tokens.weight")
+                        .unwrap_or(&[]);
                     let scale = if scale_data.len() >= 4 {
-                        f32::from_le_bytes([scale_data[0], scale_data[1], scale_data[2], scale_data[3]])
-                    } else { 1.0 };
+                        f32::from_le_bytes([
+                            scale_data[0],
+                            scale_data[1],
+                            scale_data[2],
+                            scale_data[3],
+                        ])
+                    } else {
+                        1.0
+                    };
                     let start = tok_idx * hidden_size;
                     if start + hidden_size <= embed_data.len() {
                         for (i, &b) in embed_data[start..start + hidden_size].iter().enumerate() {
@@ -118,14 +130,19 @@ impl PoxEngine {
                     }
                 }
                 DType::I4 => {
-                    let scale_data = self.file.get_scale_data("model.embed_tokens.weight").unwrap_or(&[]);
+                    let scale_data = self
+                        .file
+                        .get_scale_data("model.embed_tokens.weight")
+                        .unwrap_or(&[]);
                     let group_size = meta.group_size.as_usize().unwrap_or(128);
-                    let row_packed_bytes = (hidden_size + 1) / 2;
-                    let num_groups_per_row = (hidden_size + group_size - 1) / group_size;
+                    let row_packed_bytes = hidden_size.div_ceil(2);
+                    let num_groups_per_row = hidden_size.div_ceil(group_size);
                     let row_scale_bytes = num_groups_per_row * 4;
                     let start = tok_idx * row_packed_bytes;
                     let scale_start = tok_idx * row_scale_bytes;
-                    if start + row_packed_bytes <= embed_data.len() && scale_start + row_scale_bytes <= scale_data.len() {
+                    if start + row_packed_bytes <= embed_data.len()
+                        && scale_start + row_scale_bytes <= scale_data.len()
+                    {
                         let _ = paraoxidizer_quant::kernels::dequantize_int4_group(
                             &embed_data[start..start + row_packed_bytes],
                             &scale_data[scale_start..scale_start + row_scale_bytes],
@@ -138,7 +155,7 @@ impl PoxEngine {
                 _ => {}
             }
         }
-        
+
         let has_signal = x.iter().any(|&v| v.abs() > 1e-6);
         if !has_signal {
             let val = ((tok_idx as f32) * 0.17).sin() * 0.1;
@@ -161,8 +178,7 @@ impl PoxEngine {
                 let scale_data = self.file.get_scale_data(&proj_name).unwrap_or(&[]);
                 let outlier_data = self.file.get_outlier_data(&proj_name);
 
-                let outliers = outlier_data
-                    .and_then(|b| SparseOutlierTable::from_bytes(b).ok());
+                let outliers = outlier_data.and_then(|b| SparseOutlierTable::from_bytes(b).ok());
 
                 let mut y = vec![0.0f32; hidden_size];
 
@@ -172,7 +188,18 @@ impl PoxEngine {
                         let mut ran_metal = false;
                         if outliers.is_none() {
                             if let Some(ref metal) = self.metal_backend {
-                                if metal.gemv_int4(weight_data, scale_data, hidden_size, hidden_size, group_size, &norm_x, &mut y).is_ok() {
+                                if metal
+                                    .gemv_int4(
+                                        weight_data,
+                                        scale_data,
+                                        hidden_size,
+                                        hidden_size,
+                                        group_size,
+                                        &norm_x,
+                                        &mut y,
+                                    )
+                                    .is_ok()
+                                {
                                     ran_metal = true;
                                 }
                             }
@@ -221,8 +248,16 @@ impl PoxEngine {
             let outlier_data = self.file.get_outlier_data("lm_head.weight");
             let outliers = outlier_data.and_then(|b| SparseOutlierTable::from_bytes(b).ok());
 
-            let rows = if meta.shape.rank() >= 2 { meta.shape.dims()[0] } else { vocab_size };
-            let cols = if meta.shape.rank() >= 2 { meta.shape.dims()[1] } else { hidden_size };
+            let rows = if meta.shape.rank() >= 2 {
+                meta.shape.dims()[0]
+            } else {
+                vocab_size
+            };
+            let cols = if meta.shape.rank() >= 2 {
+                meta.shape.dims()[1]
+            } else {
+                hidden_size
+            };
 
             if meta.dtype == DType::I4 {
                 let group_size = meta.group_size.as_usize().unwrap_or(128);
@@ -247,7 +282,7 @@ impl PoxEngine {
                 );
             } else if meta.dtype == DType::F16 {
                 let row_bytes = cols * 2;
-                for r in 0..rows.min(vocab_size) {
+                for (r, logit) in logits.iter_mut().enumerate().take(rows.min(vocab_size)) {
                     let mut sum = 0.0f32;
                     let r_start = r * row_bytes;
                     if r_start + row_bytes <= head_data.len() {
@@ -258,7 +293,7 @@ impl PoxEngine {
                             sum += w * x[c];
                         }
                     }
-                    logits[r] = sum;
+                    *logit = sum;
                 }
             }
         } else {
@@ -407,7 +442,8 @@ impl PoxEngine {
                     break;
                 }
 
-                draft_logits = draft_engine.forward_token(candidate, current_pos + step, &mut draft_kv)?;
+                draft_logits =
+                    draft_engine.forward_token(candidate, current_pos + step, &mut draft_kv)?;
             }
 
             // 2. Target engine verifies candidate tokens
@@ -429,7 +465,8 @@ impl PoxEngine {
                     if candidate == self.config.eos_token_id || candidate == self.tokenizer.eos_id {
                         break;
                     }
-                    next_target_logits = self.forward_token(candidate, current_pos, &mut target_kv)?;
+                    next_target_logits =
+                        self.forward_token(candidate, current_pos, &mut target_kv)?;
                     current_pos += 1;
                 } else {
                     generated_tokens.push(target_pred);
@@ -440,10 +477,13 @@ impl PoxEngine {
                             break;
                         }
                     }
-                    if target_pred == self.config.eos_token_id || target_pred == self.tokenizer.eos_id {
+                    if target_pred == self.config.eos_token_id
+                        || target_pred == self.tokenizer.eos_id
+                    {
                         break;
                     }
-                    next_target_logits = self.forward_token(target_pred, current_pos, &mut target_kv)?;
+                    next_target_logits =
+                        self.forward_token(target_pred, current_pos, &mut target_kv)?;
                     current_pos += 1;
                     break;
                 }
@@ -529,14 +569,7 @@ mod tests {
         };
 
         let (text, drafted, _accepted, rate) = target_engine
-            .generate_speculative(
-                &draft_engine,
-                "Hello world",
-                16,
-                3,
-                sampler,
-                |_piece| true,
-            )
+            .generate_speculative(&draft_engine, "Hello world", 16, 3, sampler, |_piece| true)
             .unwrap();
 
         assert!(!text.is_empty());

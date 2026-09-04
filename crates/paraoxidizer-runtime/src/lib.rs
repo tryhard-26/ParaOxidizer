@@ -12,4 +12,3 @@ pub use metal_backend::MetalBackend;
 pub use paged_cache::{BlockManager, BlockTable, PagedKvCache};
 pub use sampler::{Sampler, SamplerConfig};
 pub use tokenizer::PoxTokenizer;
-

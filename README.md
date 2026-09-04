@@ -244,33 +244,35 @@ assert is_valid, "Tampering detected in model weights!"
 
 Measurements conducted on **Apple Silicon M4** (10-core CPU, 10-core GPU, ARM NEON, unified memory, Darwin arm64) using `cargo test --test test_real_hf_weights`, `cargo test --test test_model_degradation`, and `cargo run --release -p paraoxidizer-bench --bin pox-bench`:
 
-### 1. Real Hugging Face Hub Models & Weights Evaluation
+### 1. Production Model & Checkpoint Evaluation
 
-Empirically validated directly on real transformer checkpoints downloaded from the Hugging Face Hub:
+Empirically validated on hardware using both a real trained LLM checkpoint (`EleutherAI/pythia-70m`, 70M parameters trained on the Pile) and Hugging Face Hub architectural schema stubs:
 
-| Hugging Face Model | SafeTensors (FP16) | `.pox` (INT4 g128) | Compression | INT8 CosSim | INT4 CosSim | AWQ CosSim | INT4 SQNR |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Llama** (`hf-internal-testing/tiny-random-LlamaForCausalLM`) | 2.06 MB | 0.55 MB | **3.76x** | 0.994637 | 0.995703 | 0.995558 | 20.63 dB |
-| **Qwen-2.5** (`yujiepan/qwen2.5-tiny-random`) | 4.87 MB | 1.29 MB | **3.76x** | **0.999971** | 0.995234 | 0.995232 | 20.17 dB |
-| **Gemma** (`yujiepan/gemma-tiny-random`) | 4.10 MB | 1.09 MB | **3.76x** | **0.999961** | 0.995110 | 0.995108 | 20.06 dB |
+| Model / Checkpoint | Type / Architecture | FP16 Projection | INT4 `.pox` | Compression | INT8 CosSim | INT4 CosSim | AWQ CosSim | GPTQ CosSim | INT4 SQNR |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Pythia-70M** (`EleutherAI/pythia-70m`) | **Trained LLM** (GPT-NeoX) | 0.52 MB | 0.14 MB | **3.76x** | **0.999267** | **0.994694** | **0.994081** | **0.994351** | **19.71 dB** |
+| **Llama** (`tiny-random-LlamaForCausalLM`) | Schema Stub (Llama) | 2.05 KB | 0.55 KB | **3.76x** | 0.999965 | 0.995554 | 0.994534 | 0.994752 | 20.42 dB |
+| **Qwen-2.5** (`qwen2.5-tiny-random`) | Schema Stub (Qwen) | 2.43 MB | 0.65 MB | **3.76x** | 0.999971 | 0.995222 | 0.995221 | 0.994787 | 20.16 dB |
+| **Gemma** (`gemma-tiny-random`) | Schema Stub (Gemma) | 4.10 MB | 1.09 MB | **3.76x** | 0.999961 | 0.995103 | 0.995103 | 0.994725 | 20.05 dB |
 
-- **Real Parameter Fidelity**: Direct weight cosine similarity exceeds **0.9951** across all real model weights under INT4 group-128 quantization, and reaches **0.9999+** under symmetric INT8.
+- **Real Weight Distribution Fidelity**: On the genuine trained `Pythia-70M` checkpoint, INT8 symmetric quantization preserves **0.99927** cosine similarity, while INT4 group-128 quantization preserves **0.99469** cosine similarity with **19.71 dB SQNR**.
+- **Architectural Schema Validation**: The `tiny-random-*` stubs verify remote Hub fetching, sharded and un-sharded SafeTensors deserialization, GQA/MQA KV-head configurations, RoPE theta frequency scaling, and tokenizer fallback reversibility.
 - **Container Verification & Inference**: All converted `.pox` containers passed SHA-256 Merkle tree verification, zero NaN/Inf static scanner audits, and generated valid logits during autoregressive token forward passes.
 
 ### 2. Model Degradation & Quantization Fidelity
 
-Evaluated on transformer layer weights ($512 \times 256$) with Gaussian distributions and natural heavy-tailed outlier channels ($\ge 3.5\sigma$):
+Evaluated on transformer projection weights ($512 \times 256$) with empirical calibration activations and natural heavy-tailed outlier channels ($\ge 3.5\sigma$):
 
 | Method | Weight Cosine Sim | Weight MSE | Weight SQNR | Activation MSE | Activation Cosine Sim |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **INT8 Symmetric** | **0.999271** | $1.888 \times 10^{-6}$ | **28.36 dB** | $8.212 \times 10^{-5}$ | 0.976195 |
 | **INT4 Group-128 (Min-Max)** | 0.996662 | $8.681 \times 10^{-6}$ | 21.73 dB | $3.582 \times 10^{-4}$ | 0.907379 |
-| **INT4 Group-128 + Outliers** | **0.997191** | $7.302 \times 10^{-6}$ | **22.48 dB** | $3.118 \times 10^{-4}$ | **0.923093** |
+| **INT4 Group-128 + Outliers** | **0.997191** | $7.302 \times 10^{-6}$ | **22.48 dB** | $3.118 \times 10^{-4}$ | 0.923093 |
 | **INT4 AWQ (Hessian Salience)** | 0.996627 | $8.966 \times 10^{-6}$ | 21.59 dB | $3.222 \times 10^{-4}$ | 0.912638 |
-| **INT4 GPTQ (Damped $H^{-1}$)** | 0.996662 | $8.681 \times 10^{-6}$ | 21.73 dB | $3.582 \times 10^{-4}$ | 0.907379 |
+| **INT4 GPTQ (Damped $H^{-1}$)** | 0.996633 | $8.758 \times 10^{-6}$ | 21.69 dB | **$1.180 \times 10^{-4}$** | **0.966817** |
 
-- **Weight Preservation**: Direct weight matrix cosine similarity exceeds **0.9966** across all INT4 modes and **0.9992** for INT8, with MSE bounded under $8.97 \times 10^{-6}$.
-- **Activation Drift**: Layer output activation MSE is bounded below $3.59 \times 10^{-4}$, confirming that quantization does not introduce catastrophic degradation or precision collapse.
+- **Weight vs Activation Space Optimization**: Naive Min-Max rounding directly minimizes $\| W - \hat{W} \|_F^2$ on weight values without input awareness. AWQ prioritizes salient activation channels, reducing activation MSE from $3.582 \times 10^{-4}$ to $3.222 \times 10^{-4}$.
+- **Second-Order Error Compensation**: GPTQ utilizes the empirical damped inverse Hessian $H^{-1}$ via column-by-column error compensation to future unquantized channels, reducing output activation error by **3.03x** ($3.582 \times 10^{-4} \to 1.180 \times 10^{-4}$) and lifting output activation cosine similarity to **0.9668**.
 
 ### 3. Vector Dot-Product Microbenchmarks (ARM NEON vs Scalar)
 

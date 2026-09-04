@@ -9,7 +9,12 @@ use clap::{Parser, Subcommand};
     long_about = "ParaOxidizer turns oversized neural-network parameters into compact, hardware-optimized, verifiable inference artifacts."
 )]
 pub struct Cli {
-    #[arg(long, global = true, default_value = "text", help = "Output format: text, json, jsonl")]
+    #[arg(
+        long,
+        global = true,
+        default_value = "text",
+        help = "Output format: text, json, jsonl"
+    )]
     pub format: String,
 
     #[command(subcommand)]
@@ -33,11 +38,19 @@ pub enum Commands {
         model: String,
         #[arg(long, help = "Path to JSONL / text calibration dataset file")]
         dataset: Option<String>,
-        #[arg(long, default_value = "general", help = "Workload profile: general, coding, reasoning, agentic, chat, long-context")]
+        #[arg(
+            long,
+            default_value = "general",
+            help = "Workload profile: general, coding, reasoning, agentic, chat, long-context"
+        )]
         profile: String,
         #[arg(long, default_value = "256", help = "Number of calibration samples")]
         samples: usize,
-        #[arg(long, default_value = "calibration.poxcal", help = "Output .poxcal file path")]
+        #[arg(
+            long,
+            default_value = "calibration.poxcal",
+            help = "Output .poxcal file path"
+        )]
         output: String,
     },
 
@@ -57,9 +70,17 @@ pub enum Commands {
         bits: usize,
         #[arg(long, default_value = "128", help = "Group size: 32, 64, 128, 256")]
         group_size: usize,
-        #[arg(long, default_value = "automatic", help = "Outlier policy: disabled, automatic, conservative, aggressive")]
+        #[arg(
+            long,
+            default_value = "automatic",
+            help = "Outlier policy: disabled, automatic, conservative, aggressive"
+        )]
         outlier: String,
-        #[arg(long, default_value = "min-max", help = "Quantization algorithm: min-max, awq, gptq")]
+        #[arg(
+            long,
+            default_value = "min-max",
+            help = "Quantization algorithm: min-max, awq, gptq"
+        )]
         algorithm: String,
         #[arg(long, default_value = "model.pox", help = "Output .pox file path")]
         output: String,
@@ -77,7 +98,11 @@ pub enum Commands {
         quality: Option<f64>,
         #[arg(long, help = "Path to .poxcal calibration file")]
         calibration: Option<String>,
-        #[arg(long, default_value = "auto", help = "Target hardware profile: auto, cpu, metal, cuda")]
+        #[arg(
+            long,
+            default_value = "auto",
+            help = "Target hardware profile: auto, cpu, metal, cuda"
+        )]
         hardware: String,
         #[arg(long, default_value = "model.pox", help = "Output .pox file path")]
         output: String,
@@ -97,13 +122,22 @@ pub enum Commands {
         pubkey: Option<String>,
     },
 
-    #[command(about = "Benchmark TTFT, throughput (tok/s), latency percentiles, memory, or run hardware suite")]
+    #[command(
+        about = "Benchmark TTFT, throughput (tok/s), latency percentiles, memory, or run hardware suite"
+    )]
     Benchmark {
         #[arg(help = "Path to .pox model file (optional if --suite is specified)")]
         model: Option<String>,
-        #[arg(long, help = "Execute the comprehensive hardware SIMD, GEMV, fidelity, and system microbenchmark suite")]
+        #[arg(
+            long,
+            help = "Execute the comprehensive hardware SIMD, GEMV, fidelity, and system microbenchmark suite"
+        )]
         suite: bool,
-        #[arg(long, default_value = "Explain the architecture of a modern transformer.", help = "Benchmark prompt")]
+        #[arg(
+            long,
+            default_value = "Explain the architecture of a modern transformer.",
+            help = "Benchmark prompt"
+        )]
         prompt: String,
         #[arg(long, default_value = "64", help = "Number of tokens to decode")]
         tokens: usize,
@@ -119,7 +153,11 @@ pub enum Commands {
     Run {
         #[arg(help = "Path to .pox model file")]
         model: String,
-        #[arg(long, default_value = "Explain the significance of zero-copy tensor memory mapping.", help = "Prompt text")]
+        #[arg(
+            long,
+            default_value = "Explain the significance of zero-copy tensor memory mapping.",
+            help = "Prompt text"
+        )]
         prompt: String,
         #[arg(long, default_value = "128", help = "Maximum tokens to generate")]
         max_tokens: usize,
@@ -127,7 +165,11 @@ pub enum Commands {
         temperature: f32,
         #[arg(long, help = "Optional draft model path for speculative decoding")]
         draft: Option<String>,
-        #[arg(long, default_value = "3", help = "Speculative lookahead K candidate tokens")]
+        #[arg(
+            long,
+            default_value = "3",
+            help = "Speculative lookahead K candidate tokens"
+        )]
         lookahead: usize,
     },
 
@@ -143,7 +185,9 @@ pub enum Commands {
         draft: Option<String>,
     },
 
-    #[command(about = "Launch interactive terminal TUI dashboard for real-time inference telemetry and memory")]
+    #[command(
+        about = "Launch interactive terminal TUI dashboard for real-time inference telemetry and memory"
+    )]
     Monitor {
         #[arg(help = "Optional path to .pox model file")]
         model: Option<String>,
@@ -157,7 +201,10 @@ pub enum Commands {
         model: String,
         #[arg(long, help = "Ed25519 private key in hex")]
         key: String,
-        #[arg(long, help = "Output path for signed artifact (defaults to in-place replacement)")]
+        #[arg(
+            long,
+            help = "Output path for signed artifact (defaults to in-place replacement)"
+        )]
         output: Option<String>,
     },
 
@@ -197,7 +244,11 @@ pub enum Commands {
 
     #[command(about = "Generate a fresh Ed25519 signing keypair for model supply-chain security")]
     Keygen {
-        #[arg(long, default_value = "pox_key", help = "Prefix for private (.key) and public (.pub) files")]
+        #[arg(
+            long,
+            default_value = "pox_key",
+            help = "Prefix for private (.key) and public (.pub) files"
+        )]
         output: String,
     },
 }

@@ -1292,6 +1292,7 @@ dependencies = [
  "comfy-table",
  "half",
  "hex",
+ "paraoxidizer-calibration",
  "paraoxidizer-core",
  "paraoxidizer-format",
  "paraoxidizer-quant",

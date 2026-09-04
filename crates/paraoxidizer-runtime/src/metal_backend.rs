@@ -66,9 +66,13 @@ pub mod macos_metal {
             let command_queue = device.new_command_queue();
 
             let options = CompileOptions::new();
-            let library = device.new_library_with_source(SHADER_SOURCE, &options).ok()?;
+            let library = device
+                .new_library_with_source(SHADER_SOURCE, &options)
+                .ok()?;
             let kernel_fn = library.get_function("gemv_int4_kernel", None).ok()?;
-            let pipeline_state = device.new_compute_pipeline_state_with_function(&kernel_fn).ok()?;
+            let pipeline_state = device
+                .new_compute_pipeline_state_with_function(&kernel_fn)
+                .ok()?;
 
             Some(Arc::new(Self {
                 device,
@@ -77,6 +81,7 @@ pub mod macos_metal {
             }))
         }
 
+        #[allow(clippy::too_many_arguments)]
         pub fn gemv_int4(
             &self,
             packed_weights: &[u8],
@@ -124,12 +129,30 @@ pub mod macos_metal {
             encoder.set_buffer(1, Some(&buf_scales), 0);
             encoder.set_buffer(2, Some(&buf_x), 0);
             encoder.set_buffer(3, Some(&buf_y), 0);
-            encoder.set_bytes(4, std::mem::size_of::<u32>() as u64, &rows_u32 as *const _ as *const _);
-            encoder.set_bytes(5, std::mem::size_of::<u32>() as u64, &cols_u32 as *const _ as *const _);
-            encoder.set_bytes(6, std::mem::size_of::<u32>() as u64, &group_u32 as *const _ as *const _);
+            encoder.set_bytes(
+                4,
+                std::mem::size_of::<u32>() as u64,
+                &rows_u32 as *const _ as *const _,
+            );
+            encoder.set_bytes(
+                5,
+                std::mem::size_of::<u32>() as u64,
+                &cols_u32 as *const _ as *const _,
+            );
+            encoder.set_bytes(
+                6,
+                std::mem::size_of::<u32>() as u64,
+                &group_u32 as *const _ as *const _,
+            );
 
             let thread_group_count = MTLSize::new(rows as u64, 1, 1);
-            let thread_group_size = MTLSize::new(self.pipeline_state.max_total_threads_per_threadgroup().min(64), 1, 1);
+            let thread_group_size = MTLSize::new(
+                self.pipeline_state
+                    .max_total_threads_per_threadgroup()
+                    .min(64),
+                1,
+                1,
+            );
 
             encoder.dispatch_threads(thread_group_count, thread_group_size);
             encoder.end_encoding();
@@ -160,6 +183,7 @@ pub mod non_macos {
             None
         }
 
+        #[allow(clippy::too_many_arguments)]
         pub fn gemv_int4(
             &self,
             _packed_weights: &[u8],
@@ -170,7 +194,9 @@ pub mod non_macos {
             _x: &[f32],
             _y: &mut [f32],
         ) -> Result<()> {
-            Err(PoxError::Runtime("Metal backend is only supported on macOS".into()))
+            Err(PoxError::Runtime(
+                "Metal backend is only supported on macOS".into(),
+            ))
         }
     }
 }
@@ -200,8 +226,11 @@ mod tests {
             assert!(res.is_ok());
             // Ensure non-zero computation on Metal GPU
             let sum_abs: f32 = y.iter().map(|v| v.abs()).sum();
-            assert!(sum_abs > 0.01, "Metal GEMV computed valid non-zero outputs: {}", sum_abs);
+            assert!(
+                sum_abs > 0.01,
+                "Metal GEMV computed valid non-zero outputs: {}",
+                sum_abs
+            );
         }
     }
 }
-

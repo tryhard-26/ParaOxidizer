@@ -7,6 +7,7 @@ pub mod workload;
 
 pub use hessian::HessianMatrix;
 pub use recorder::CalibrationEngine;
-pub use sensitivity::{ModelSensitivityReport, SensitivityEngine, SensitivityLevel, TensorSensitivity};
+pub use sensitivity::{
+    ModelSensitivityReport, SensitivityEngine, SensitivityLevel, TensorSensitivity,
+};
 pub use workload::WorkloadProfile;
-

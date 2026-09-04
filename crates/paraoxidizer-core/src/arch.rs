@@ -62,7 +62,10 @@ pub enum ComponentType {
 impl ComponentType {
     pub fn classify_tensor_name(name: &str) -> Self {
         let lower = name.to_lowercase();
-        if lower.contains("embed_tokens") || lower.contains("wte") || lower.contains("tok_embeddings") {
+        if lower.contains("embed_tokens")
+            || lower.contains("wte")
+            || lower.contains("tok_embeddings")
+        {
             ComponentType::Embedding
         } else if lower.contains("q_proj") || lower.contains("wq") {
             ComponentType::AttentionQ

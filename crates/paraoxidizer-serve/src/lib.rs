@@ -10,12 +10,7 @@ use paraoxidizer_core::error::{PoxError, Result};
 use paraoxidizer_runtime::engine::PoxEngine;
 use std::{net::SocketAddr, sync::Arc};
 
-pub async fn run_server(
-    engine: PoxEngine,
-    host: &str,
-    port: u16,
-    model_id: String,
-) -> Result<()> {
+pub async fn run_server(engine: PoxEngine, host: &str, port: u16, model_id: String) -> Result<()> {
     let metrics = Arc::new(ServerMetrics::default());
     let state = AppState {
         engine: Arc::new(engine),

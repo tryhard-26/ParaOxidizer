@@ -4,8 +4,8 @@ use common::create_hf_llama_model;
 use paraoxidizer::cli::commands;
 use paraoxidizer::format::PoxFile;
 use paraoxidizer::quant::{
-    dequantize_int4_group, dequantize_int8_symmetric, dot_product_simd,
-    quantize_int4_group, quantize_int8_symmetric, OutlierPolicy, SparseOutlierTable,
+    dequantize_int4_group, dequantize_int8_symmetric, dot_product_simd, quantize_int4_group,
+    quantize_int8_symmetric, OutlierPolicy, SparseOutlierTable,
 };
 use paraoxidizer::security::{verify_signature_hex, KeyPair};
 use tempfile::tempdir;
@@ -19,7 +19,7 @@ fn test_int4_group_quantization_roundtrip() {
 
     for group_size in [32, 64, 128, 256] {
         let (packed, scales) = quantize_int4_group(&weights, group_size);
-        assert_eq!(packed.len(), (weights.len() + 1) / 2);
+        assert_eq!(packed.len(), weights.len().div_ceil(2));
 
         let mut dequant = vec![0.0f32; weights.len()];
         dequantize_int4_group(&packed, &scales, group_size, weights.len(), &mut dequant).unwrap();
@@ -34,7 +34,12 @@ fn test_int4_group_quantization_roundtrip() {
         }
 
         // For INT4 with dynamic range 5.0, max step is ~5.0/15 = 0.33, so max error <= 0.25
-        assert!(max_err < 0.25, "Group size {} had max error {}", group_size, max_err);
+        assert!(
+            max_err < 0.25,
+            "Group size {} had max error {}",
+            group_size,
+            max_err
+        );
     }
 }
 
@@ -68,7 +73,8 @@ fn test_outlier_extraction_and_restoration() {
     weights[120] = -18.0;
     let orig_weights = weights.clone();
 
-    let table_opt = SparseOutlierTable::extract_and_zero_outliers(&mut weights, OutlierPolicy::Automatic);
+    let table_opt =
+        SparseOutlierTable::extract_and_zero_outliers(&mut weights, OutlierPolicy::Automatic);
     assert!(table_opt.is_some());
     let table = table_opt.unwrap();
     assert_eq!(table.len(), 2); // 15.0 and -18.0 extracted
@@ -151,7 +157,10 @@ fn test_tamper_detection_in_pox_file() {
 
     // Verification must detect the bit-flip and fail
     let verify_res = commands::run_verify(tampered_path.to_str().unwrap(), None);
-    assert!(verify_res.is_err(), "Cryptographic verification must fail on tampered bytes");
+    assert!(
+        verify_res.is_err(),
+        "Cryptographic verification must fail on tampered bytes"
+    );
 }
 
 #[test]
@@ -190,7 +199,10 @@ target_hardware = "auto"
 
     // Validate
     let pox = PoxFile::open(&out_pox).unwrap();
-    assert_eq!(pox.metadata.model_config.architecture, paraoxidizer::core::ModelArchitecture::Llama);
+    assert_eq!(
+        pox.metadata.model_config.architecture,
+        paraoxidizer::core::ModelArchitecture::Llama
+    );
 }
 
 #[test]
@@ -221,8 +233,10 @@ fn test_workload_and_reproduce() {
 
 #[test]
 fn test_awq_and_gptq_fidelity() {
-    use paraoxidizer::quant::{dequantize_int4_group, quantize_awq, quantize_gptq, quantize_int4_group};
     use paraoxidizer::calibration::HessianMatrix;
+    use paraoxidizer::quant::{
+        dequantize_int4_group, quantize_awq, quantize_gptq, quantize_int4_group,
+    };
 
     let rows = 64;
     let cols = 64;
@@ -233,14 +247,26 @@ fn test_awq_and_gptq_fidelity() {
     let (base_packed, base_scales) = quantize_int4_group(&weights, 32);
     let mut base_dequant = vec![0.0f32; total];
     dequantize_int4_group(&base_packed, &base_scales, 32, total, &mut base_dequant).unwrap();
-    let base_mse: f32 = weights.iter().zip(base_dequant.iter()).map(|(w, q)| (w - q).powi(2)).sum::<f32>() / total as f32;
+    let base_mse: f32 = weights
+        .iter()
+        .zip(base_dequant.iter())
+        .map(|(w, q)| (w - q).powi(2))
+        .sum::<f32>()
+        / total as f32;
 
     // 2. AWQ Quantization with activation scales
-    let act_scales: Vec<f32> = (0..cols).map(|c| (c as f32 * 0.1).cos().abs() + 0.1).collect();
+    let act_scales: Vec<f32> = (0..cols)
+        .map(|c| (c as f32 * 0.1).cos().abs() + 0.1)
+        .collect();
     let (awq_packed, awq_scales) = quantize_awq(&weights, rows, cols, &act_scales, 32);
     let mut awq_dequant = vec![0.0f32; total];
     dequantize_int4_group(&awq_packed, &awq_scales, 32, total, &mut awq_dequant).unwrap();
-    let awq_mse: f32 = weights.iter().zip(awq_dequant.iter()).map(|(w, q)| (w - q).powi(2)).sum::<f32>() / total as f32;
+    let awq_mse: f32 = weights
+        .iter()
+        .zip(awq_dequant.iter())
+        .map(|(w, q)| (w - q).powi(2))
+        .sum::<f32>()
+        / total as f32;
 
     // 3. GPTQ Quantization with Hessian
     let mut hessian = HessianMatrix::new(cols);
@@ -250,10 +276,14 @@ fn test_awq_and_gptq_fidelity() {
     let (gptq_packed, gptq_scales) = quantize_gptq(&weights, rows, cols, &hessian.inv_data, 32);
     let mut gptq_dequant = vec![0.0f32; total];
     dequantize_int4_group(&gptq_packed, &gptq_scales, 32, total, &mut gptq_dequant).unwrap();
-    let gptq_mse: f32 = weights.iter().zip(gptq_dequant.iter()).map(|(w, q)| (w - q).powi(2)).sum::<f32>() / total as f32;
+    let gptq_mse: f32 = weights
+        .iter()
+        .zip(gptq_dequant.iter())
+        .map(|(w, q)| (w - q).powi(2))
+        .sum::<f32>()
+        / total as f32;
 
     assert!(base_mse < 0.01, "Base MSE must be low: {}", base_mse);
     assert!(awq_mse < 0.01, "AWQ MSE must be low: {}", awq_mse);
     assert!(gptq_mse < 0.01, "GPTQ MSE must be low: {}", gptq_mse);
 }
-

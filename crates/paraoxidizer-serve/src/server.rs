@@ -9,10 +9,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use paraoxidizer_runtime::{
-    engine::PoxEngine,
-    sampler::SamplerConfig,
-};
+use paraoxidizer_runtime::{engine::PoxEngine, sampler::SamplerConfig};
 use serde::{Deserialize, Serialize};
 use std::{sync::Arc, time::Instant};
 use tower_http::cors::CorsLayer;

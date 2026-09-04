@@ -99,7 +99,11 @@ impl HessianMatrix {
             }
 
             let pivot = h[col * n + col];
-            let pivot_inv = if pivot.abs() > 1e-12 { 1.0 / pivot } else { 1.0 };
+            let pivot_inv = if pivot.abs() > 1e-12 {
+                1.0 / pivot
+            } else {
+                1.0
+            };
 
             for c in 0..n {
                 h[col * n + c] *= pivot_inv;
@@ -122,7 +126,11 @@ impl HessianMatrix {
 
     pub fn get_inv(&self, r: usize, c: usize) -> f32 {
         if self.inv_data.is_empty() {
-            if r == c { 1.0 } else { 0.0 }
+            if r == c {
+                1.0
+            } else {
+                0.0
+            }
         } else {
             self.inv_data[r * self.dim + c]
         }

@@ -1,6 +1,7 @@
 mod common;
 
 use common::create_hf_llama_model;
+use paraoxidizer::calibration::HessianMatrix;
 use paraoxidizer::cli::commands::run_quantize;
 use paraoxidizer::format::PoxFile;
 use paraoxidizer::quant::kernels::{
@@ -174,8 +175,11 @@ fn test_layer_quantization_degradation() {
     // 3. INT4 Group-128 + Sparse Outliers (>= 3.5 std dev)
     {
         let mut weights_copy = weights.clone();
-        let outliers = SparseOutlierTable::extract_and_zero_outliers(&mut weights_copy, OutlierPolicy::Automatic)
-            .unwrap_or_default();
+        let outliers = SparseOutlierTable::extract_and_zero_outliers(
+            &mut weights_copy,
+            OutlierPolicy::Automatic,
+        )
+        .unwrap_or_default();
         let (packed, scales) = quantize_int4_group(&weights_copy, 128);
         let mut dequant = vec![0.0f32; numel];
         dequantize_int4_group(&packed, &scales, 128, numel, &mut dequant).unwrap();
@@ -254,24 +258,17 @@ fn test_layer_quantization_degradation() {
 
     // 5. INT4 GPTQ (Optimal Brain Quantization with H^-1 error compensation)
     {
-        let mut hessian = vec![0.0f32; cols * cols];
+        let mut hess_mat = HessianMatrix::new(cols);
+        let mut acts_t = vec![0.0f32; cols * num_tokens];
         for t in 0..num_tokens {
-            let x_tok = &activations[t * cols..(t + 1) * cols];
-            for i in 0..cols {
-                for j in 0..cols {
-                    hessian[i * cols + j] += x_tok[i] * x_tok[j];
-                }
+            for c in 0..cols {
+                acts_t[c * num_tokens + t] = activations[t * cols + c];
             }
         }
-        for v in &mut hessian {
-            *v *= 2.0 / (num_tokens as f32);
-        }
-        let mut inv_h = vec![0.0f32; cols * cols];
-        for i in 0..cols {
-            inv_h[i * cols + i] = 1.0 / (hessian[i * cols + i] + 0.01);
-        }
+        hess_mat.accumulate_activations(&acts_t, num_tokens);
+        hess_mat.compute_inverse(0.01);
 
-        let (packed, scales) = quantize_gptq(&weights, rows, cols, &inv_h, 128);
+        let (packed, scales) = quantize_gptq(&weights, rows, cols, &hess_mat.inv_data, 128);
         let mut dequant = vec![0.0f32; numel];
         dequantize_int4_group(&packed, &scales, 128, numel, &mut dequant).unwrap();
 
@@ -302,19 +299,48 @@ fn test_layer_quantization_degradation() {
         });
     }
 
-    println!("{:<28} | {:<12} | {:<12} | {:<10} | {:<10} | {:<12}", "Method", "Weight CosSim", "Weight MSE", "SQNR (dB)", "Act MSE", "Act CosSim");
-    println!("{:-<28}-|-{:-<12}-|-{:-<12}-|-{:-<10}-|-{:-<10}-|-{:-<12}", "", "", "", "", "", "");
+    println!(
+        "{:<28} | {:<12} | {:<12} | {:<10} | {:<10} | {:<12}",
+        "Method", "Weight CosSim", "Weight MSE", "SQNR (dB)", "Act MSE", "Act CosSim"
+    );
+    println!(
+        "{:-<28}-|-{:-<12}-|-{:-<12}-|-{:-<10}-|-{:-<10}-|-{:-<12}",
+        "", "", "", "", "", ""
+    );
     for m in &metrics_table {
-        println!("{:<28} | {:<12.6} | {:<12.3e} | {:<10.2} | {:<10.3e} | {:<12.6}", m.method, m.weight_cos_sim, m.weight_mse, m.weight_sqnr_db, m.act_mse, m.act_cos_sim);
+        println!(
+            "{:<28} | {:<12.6} | {:<12.3e} | {:<10.2} | {:<10.3e} | {:<12.6}",
+            m.method, m.weight_cos_sim, m.weight_mse, m.weight_sqnr_db, m.act_mse, m.act_cos_sim
+        );
     }
     println!("==========================================================================================\n");
 
     // Quantitative degradation assertions:
     for m in &metrics_table {
-        assert!(m.weight_cos_sim >= 0.9950, "{} weight cosine similarity degraded: {}", m.method, m.weight_cos_sim);
-        assert!(m.weight_mse < 0.001, "{} weight MSE degraded: {}", m.method, m.weight_mse);
-        assert!(m.weight_sqnr_db >= 20.0, "{} SQNR degraded: {}", m.method, m.weight_sqnr_db);
-        assert!(m.act_mse < 0.001, "{} activation MSE degraded: {}", m.method, m.act_mse);
+        assert!(
+            m.weight_cos_sim >= 0.9950,
+            "{} weight cosine similarity degraded: {}",
+            m.method,
+            m.weight_cos_sim
+        );
+        assert!(
+            m.weight_mse < 0.001,
+            "{} weight MSE degraded: {}",
+            m.method,
+            m.weight_mse
+        );
+        assert!(
+            m.weight_sqnr_db >= 20.0,
+            "{} SQNR degraded: {}",
+            m.method,
+            m.weight_sqnr_db
+        );
+        assert!(
+            m.act_mse < 0.001,
+            "{} activation MSE degraded: {}",
+            m.method,
+            m.act_mse
+        );
     }
 }
 
@@ -407,6 +433,12 @@ fn test_end_to_end_model_degradation() {
     println!("=======================================================\n");
 
     // Assertions: Logit directional alignment across multi-layer transformer passes
-    assert!(avg_cos_sim_int4 >= 0.70, "INT4 logit correlation degraded: {avg_cos_sim_int4}");
-    assert!(avg_cos_sim_awq >= 0.70, "AWQ logit correlation degraded: {avg_cos_sim_awq}");
+    assert!(
+        avg_cos_sim_int4 >= 0.70,
+        "INT4 logit correlation degraded: {avg_cos_sim_int4}"
+    );
+    assert!(
+        avg_cos_sim_awq >= 0.70,
+        "AWQ logit correlation degraded: {avg_cos_sim_awq}"
+    );
 }

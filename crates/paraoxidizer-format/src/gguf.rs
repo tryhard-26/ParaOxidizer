@@ -1,6 +1,11 @@
 use byteorder::{LittleEndian, ReadBytesExt};
 use paraoxidizer_core::error::{PoxError, Result};
-use std::{collections::HashMap, fs::File, io::{BufReader, Read}, path::Path};
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::{BufReader, Read},
+    path::Path,
+};
 
 pub const GGUF_MAGIC: &[u8; 4] = b"GGUF";
 

@@ -1,4 +1,8 @@
-#![allow(clippy::too_many_arguments, clippy::manual_div_ceil, clippy::needless_range_loop)]
+#![allow(
+    clippy::too_many_arguments,
+    clippy::manual_div_ceil,
+    clippy::needless_range_loop
+)]
 
 use crate::outlier::SparseOutlierTable;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
@@ -19,10 +23,7 @@ pub fn unpack_i4(byte: u8) -> (u8, u8) {
 }
 
 /// Quantize a slice of f32 to group-wise INT4
-pub fn quantize_int4_group(
-    weights: &[f32],
-    group_size: usize,
-) -> (Vec<u8>, Vec<u8>) {
+pub fn quantize_int4_group(weights: &[f32], group_size: usize) -> (Vec<u8>, Vec<u8>) {
     let numel = weights.len();
     let num_groups = (numel + group_size - 1) / group_size;
 
@@ -153,11 +154,7 @@ pub fn quantize_int8_symmetric(weights: &[f32]) -> (Vec<u8>, Vec<u8>) {
 }
 
 /// Dequantize symmetric INT8 to f32
-pub fn dequantize_int8_symmetric(
-    q_data: &[u8],
-    scale_data: &[u8],
-    out: &mut [f32],
-) -> Result<()> {
+pub fn dequantize_int8_symmetric(q_data: &[u8], scale_data: &[u8], out: &mut [f32]) -> Result<()> {
     if scale_data.len() < 4 {
         return Err(PoxError::Quantization("Invalid INT8 scale data".into()));
     }
@@ -238,7 +235,9 @@ pub fn gemv_int8(
     y: &mut [f32],
 ) -> Result<()> {
     if x.len() < cols || y.len() < rows || q_weights.len() < rows * cols {
-        return Err(PoxError::Quantization("GEMV INT8 dimension mismatch".into()));
+        return Err(PoxError::Quantization(
+            "GEMV INT8 dimension mismatch".into(),
+        ));
     }
     let mut cursor = Cursor::new(scale_data);
     let scale = cursor.read_f32::<LittleEndian>()?;
@@ -317,6 +316,49 @@ pub fn dot_product_simd(a: &[f32], b: &[f32]) -> f32 {
     }
 }
 
+/// Compute per-channel AWQ salience scaling factors from calibration activation scales
+pub fn compute_awq_scales(act_scales: &[f32], cols: usize) -> Vec<f32> {
+    if act_scales.is_empty() || act_scales.len() != cols {
+        return vec![1.0f32; cols];
+    }
+    let max_scale = act_scales
+        .iter()
+        .fold(0.0f32, |acc, &s| acc.max(s.abs()))
+        .max(1e-6);
+    let mut protection = vec![1.0f32; cols];
+    for c in 0..cols {
+        let ratio = (act_scales[c].abs() / max_scale).powf(0.5);
+        protection[c] = ratio.clamp(0.1, 2.0);
+    }
+    protection
+}
+
+/// Dequantize AWQ-quantized weights back to original unscaled numerical range
+pub fn dequantize_awq(
+    packed: &[u8],
+    scales: &[u8],
+    protection: &[f32],
+    group_size: usize,
+    rows: usize,
+    cols: usize,
+    out: &mut [f32],
+) -> Result<()> {
+    let numel = rows * cols;
+    dequantize_int4_group(packed, scales, group_size, numel, out)?;
+    if !protection.is_empty() && protection.len() == cols {
+        for r in 0..rows {
+            let row_offset = r * cols;
+            for c in 0..cols {
+                let p = protection[c];
+                if p.abs() > 1e-8 {
+                    out[row_offset + c] /= p;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Activation-Aware Weight Quantization (AWQ)
 /// Protects salient channels by scaling them prior to group-wise INT4 quantization.
 pub fn quantize_awq(
@@ -327,18 +369,11 @@ pub fn quantize_awq(
     group_size: usize,
 ) -> (Vec<u8>, Vec<u8>) {
     let mut scaled_weights = weights.to_vec();
-    if !act_scales.is_empty() && act_scales.len() == cols {
-        let max_scale = act_scales.iter().fold(0.0f32, |acc, &s| acc.max(s.abs())).max(1e-6);
-        let mut protection = vec![1.0f32; cols];
+    let protection = compute_awq_scales(act_scales, cols);
+    for r in 0..rows {
+        let row_offset = r * cols;
         for c in 0..cols {
-            let ratio = (act_scales[c].abs() / max_scale).powf(0.5);
-            protection[c] = ratio.clamp(0.1, 2.0);
-        }
-        for r in 0..rows {
-            let row_offset = r * cols;
-            for c in 0..cols {
-                scaled_weights[row_offset + c] *= protection[c];
-            }
+            scaled_weights[row_offset + c] *= protection[c];
         }
     }
     quantize_int4_group(&scaled_weights, group_size)
@@ -369,8 +404,12 @@ pub fn quantize_gptq(
         let mut min_val = f32::INFINITY;
         let mut max_val = f32::NEG_INFINITY;
         for &w in &w_mat[start..end] {
-            if w < min_val { min_val = w; }
-            if w > max_val { max_val = w; }
+            if w < min_val {
+                min_val = w;
+            }
+            if w > max_val {
+                max_val = w;
+            }
         }
         if (max_val - min_val).abs() < 1e-8 {
             max_val = min_val + 1e-4;
@@ -382,7 +421,11 @@ pub fn quantize_gptq(
 
     // Column-by-column update
     for j in 0..cols {
-        let h_jj = if has_valid_h { inv_hessian[j * cols + j] } else { 1.0 };
+        let h_jj = if has_valid_h {
+            inv_hessian[j * cols + j]
+        } else {
+            1.0
+        };
         let h_jj_inv = if h_jj.abs() > 1e-12 { 1.0 / h_jj } else { 1.0 };
 
         let mut errors = vec![0.0f32; rows];
@@ -418,8 +461,12 @@ pub fn quantize_gptq(
     for g in 0..num_groups {
         let scale = scales[g];
         let min_offset = min_offsets[g];
-        scale_data.write_u16::<LittleEndian>(f16::from_f32(scale).to_bits()).unwrap();
-        scale_data.write_u16::<LittleEndian>(f16::from_f32(min_offset).to_bits()).unwrap();
+        scale_data
+            .write_u16::<LittleEndian>(f16::from_f32(scale).to_bits())
+            .unwrap();
+        scale_data
+            .write_u16::<LittleEndian>(f16::from_f32(min_offset).to_bits())
+            .unwrap();
 
         let start = g * group_size;
         let end = (start + group_size).min(numel);
@@ -440,4 +487,3 @@ pub fn quantize_gptq(
 
     (packed_data, scale_data)
 }
-

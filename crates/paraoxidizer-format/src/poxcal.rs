@@ -1,6 +1,11 @@
 use paraoxidizer_core::error::{PoxError, Result};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs::File, io::{Read, Write}, path::Path};
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::{Read, Write},
+    path::Path,
+};
 
 pub const POXCAL_MAGIC: &[u8; 4] = b"PXCL";
 pub const POXCAL_VERSION: u32 = 1;

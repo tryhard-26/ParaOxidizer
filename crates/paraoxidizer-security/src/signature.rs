@@ -22,7 +22,9 @@ impl KeyPair {
         let bytes = hex::decode(hex_str.trim())
             .map_err(|e| PoxError::Security(format!("Invalid private key hex: {e}")))?;
         if bytes.len() != 32 {
-            return Err(PoxError::Security("Private key must be exactly 32 bytes".into()));
+            return Err(PoxError::Security(
+                "Private key must be exactly 32 bytes".into(),
+            ));
         }
         let mut arr = [0u8; 32];
         arr.copy_from_slice(&bytes);

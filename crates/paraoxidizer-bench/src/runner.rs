@@ -90,12 +90,7 @@ impl Default for BenchmarkHarness {
 }
 
 impl BenchmarkHarness {
-    pub fn run(
-        &self,
-        engine: &PoxEngine,
-        prompt: &str,
-        load_time_ms: f64,
-    ) -> BenchmarkResult {
+    pub fn run(&self, engine: &PoxEngine, prompt: &str, load_time_ms: f64) -> BenchmarkResult {
         let sampler = SamplerConfig {
             temperature: 0.7,
             top_p: 0.9,

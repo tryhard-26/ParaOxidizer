@@ -52,7 +52,9 @@ impl PhysicalBlock {
         v: &[f32],
     ) -> Result<()> {
         if token_idx >= self.block_size {
-            return Err(PoxError::Runtime("Token index exceeds block capacity".into()));
+            return Err(PoxError::Runtime(
+                "Token index exceeds block capacity".into(),
+            ));
         }
         let offset = self.get_offset(token_idx, layer, head);
         let len = k.len().min(self.head_dim);
@@ -82,7 +84,13 @@ impl BlockManager {
         let mut blocks = Vec::with_capacity(total_blocks);
         let mut free_block_ids = Vec::with_capacity(total_blocks);
         for id in 0..total_blocks {
-            blocks.push(PhysicalBlock::new(id, block_size, num_layers, num_kv_heads, head_dim));
+            blocks.push(PhysicalBlock::new(
+                id,
+                block_size,
+                num_layers,
+                num_kv_heads,
+                head_dim,
+            ));
             free_block_ids.push(id);
         }
         Self {
@@ -95,7 +103,9 @@ impl BlockManager {
 
     pub fn allocate_block(&mut self) -> Result<usize> {
         self.free_block_ids.pop().ok_or_else(|| {
-            PoxError::Runtime("PagedAttention Out of Memory: No free physical blocks available".into())
+            PoxError::Runtime(
+                "PagedAttention Out of Memory: No free physical blocks available".into(),
+            )
         })
     }
 
@@ -110,7 +120,11 @@ impl BlockManager {
     }
 
     pub fn memory_usage_bytes(&self) -> usize {
-        let total_elems: usize = self.blocks.iter().map(|b| b.k_data.len() + b.v_data.len()).sum();
+        let total_elems: usize = self
+            .blocks
+            .iter()
+            .map(|b| b.k_data.len() + b.v_data.len())
+            .sum();
         total_elems * 4
     }
 }
@@ -170,7 +184,8 @@ impl PagedKvCache {
         num_kv_heads: usize,
         head_dim: usize,
     ) -> Self {
-        let manager = BlockManager::new(total_blocks, block_size, num_layers, num_kv_heads, head_dim);
+        let manager =
+            BlockManager::new(total_blocks, block_size, num_layers, num_kv_heads, head_dim);
         Self {
             manager: Arc::new(Mutex::new(manager)),
         }

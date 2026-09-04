@@ -1,5 +1,8 @@
 use paraoxidizer_quant::{
-    kernels::{dequantize_int4_group, dequantize_int8_symmetric, quantize_int4_group, quantize_int8_symmetric},
+    kernels::{
+        compute_awq_scales, dequantize_awq, dequantize_int4_group, dequantize_int8_symmetric,
+        quantize_awq, quantize_gptq, quantize_int4_group, quantize_int8_symmetric,
+    },
     outlier::{OutlierPolicy, SparseOutlierTable},
 };
 use serde::{Deserialize, Serialize};
@@ -153,8 +156,11 @@ pub fn run_fidelity_benchmarks() -> Vec<FidelityBenchmarkResult> {
     {
         let start = Instant::now();
         let mut weights_copy = weights.clone();
-        let outliers = SparseOutlierTable::extract_and_zero_outliers(&mut weights_copy, OutlierPolicy::Automatic)
-            .unwrap_or_default();
+        let outliers = SparseOutlierTable::extract_and_zero_outliers(
+            &mut weights_copy,
+            OutlierPolicy::Automatic,
+        )
+        .unwrap_or_default();
         let (packed, scales) = quantize_int4_group(&weights_copy, 128);
         let elapsed = start.elapsed().as_secs_f64();
         let throughput = ((original_fp16_bytes as f64) / 1e6) / elapsed;
@@ -167,7 +173,10 @@ pub fn run_fidelity_benchmarks() -> Vec<FidelityBenchmarkResult> {
         }
 
         let (mse, mae, cos_sim, sqnr) = compute_metrics(&weights, &dequant);
-        let compressed_bytes = packed.len() + scales.len() + (outliers.indices.len() * 4) + (outliers.values.len() * 2);
+        let compressed_bytes = packed.len()
+            + scales.len()
+            + (outliers.indices.len() * 4)
+            + (outliers.values.len() * 2);
 
         results.push(FidelityBenchmarkResult {
             format_name: "INT4 Group-128 + Outliers".to_string(),
@@ -183,6 +192,82 @@ pub fn run_fidelity_benchmarks() -> Vec<FidelityBenchmarkResult> {
         });
     }
 
+    // 6. INT4 AWQ (Salience-scaled Group-128)
+    {
+        let rows = 1000;
+        let cols = 1000;
+        let mut act_scales = vec![0.0f32; cols];
+        for c in 0..cols {
+            let channel_weight_l1: f32 = (0..rows).map(|r| weights[r * cols + c].abs()).sum();
+            act_scales[c] =
+                (channel_weight_l1 / rows as f32) * (1.0 + ((c as f32 * 0.1).sin() * 0.5));
+        }
+
+        let start = Instant::now();
+        let (packed, scales) = quantize_awq(&weights, rows, cols, &act_scales, 128);
+        let elapsed = start.elapsed().as_secs_f64();
+        let throughput = ((original_fp16_bytes as f64) / 1e6) / elapsed;
+
+        let protection = compute_awq_scales(&act_scales, cols);
+        let mut dequant = vec![0.0f32; numel];
+        dequantize_awq(&packed, &scales, &protection, 128, rows, cols, &mut dequant).unwrap();
+
+        let (mse, mae, cos_sim, sqnr) = compute_metrics(&weights, &dequant);
+        let compressed_bytes = packed.len() + scales.len();
+
+        results.push(FidelityBenchmarkResult {
+            format_name: "INT4 AWQ (Salience-scaled)".to_string(),
+            original_bytes: original_fp16_bytes,
+            quantized_bytes: compressed_bytes,
+            compression_ratio: (original_fp16_bytes as f64) / (compressed_bytes as f64),
+            quant_throughput_mb_s: throughput,
+            mse,
+            mae,
+            cosine_similarity: cos_sim,
+            sqnr_db: sqnr,
+            outlier_count: 0,
+        });
+    }
+
+    // 7. INT4 GPTQ (Damped H^-1 Error Compensation)
+    {
+        let rows = 1000;
+        let cols = 1000;
+        let num_samples = 64;
+        let mut hessian = paraoxidizer_calibration::HessianMatrix::new(cols);
+        let mut calib_x = vec![0.0f32; cols * num_samples];
+        for s in 0..num_samples {
+            for c in 0..cols {
+                calib_x[c * num_samples + s] = ((s as f32 * 0.3 + c as f32 * 0.05).sin()) * 0.1;
+            }
+        }
+        hessian.accumulate_activations(&calib_x, num_samples);
+        hessian.compute_inverse(0.01);
+
+        let start = Instant::now();
+        let (packed, scales) = quantize_gptq(&weights, rows, cols, &hessian.inv_data, 128);
+        let elapsed = start.elapsed().as_secs_f64();
+        let throughput = ((original_fp16_bytes as f64) / 1e6) / elapsed;
+
+        let mut dequant = vec![0.0f32; numel];
+        dequantize_int4_group(&packed, &scales, 128, numel, &mut dequant).unwrap();
+
+        let (mse, mae, cos_sim, sqnr) = compute_metrics(&weights, &dequant);
+        let compressed_bytes = packed.len() + scales.len();
+
+        results.push(FidelityBenchmarkResult {
+            format_name: "INT4 GPTQ (Damped H^-1)".to_string(),
+            original_bytes: original_fp16_bytes,
+            quantized_bytes: compressed_bytes,
+            compression_ratio: (original_fp16_bytes as f64) / (compressed_bytes as f64),
+            quant_throughput_mb_s: throughput,
+            mse,
+            mae,
+            cosine_similarity: cos_sim,
+            sqnr_db: sqnr,
+            outlier_count: 0,
+        });
+    }
 
     results
 }

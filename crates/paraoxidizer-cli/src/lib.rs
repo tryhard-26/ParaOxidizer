@@ -24,13 +24,7 @@ pub async fn run() -> anyhow::Result<()> {
             samples,
             output,
         } => {
-            commands::run_calibrate(
-                &model,
-                dataset.as_deref(),
-                &profile,
-                samples,
-                &output,
-            )?;
+            commands::run_calibrate(&model, dataset.as_deref(), &profile, samples, &output)?;
         }
         Commands::Analyze { model, calibration } => {
             commands::run_analyze(&model, calibration.as_deref(), &cli.format)?;

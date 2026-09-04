@@ -1,6 +1,8 @@
 #![allow(clippy::needless_range_loop)]
 
-use paraoxidizer_quant::kernels::{dot_product_simd, gemv_int4, gemv_int8, quantize_int4_group, quantize_int8_symmetric};
+use paraoxidizer_quant::kernels::{
+    dot_product_simd, gemv_int4, gemv_int8, quantize_int4_group, quantize_int8_symmetric,
+};
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
@@ -41,7 +43,9 @@ pub fn run_dot_product_benchmarks() -> Vec<DotProductBenchmarkResult> {
 
     for &size in &sizes {
         let a: Vec<f32> = (0..size).map(|i| ((i % 100) as f32) * 0.01).collect();
-        let b: Vec<f32> = (0..size).map(|i| (((i + 50) % 100) as f32) * 0.01).collect();
+        let b: Vec<f32> = (0..size)
+            .map(|i| (((i + 50) % 100) as f32) * 0.01)
+            .collect();
 
         // Warmup
         for _ in 0..50 {
@@ -66,7 +70,11 @@ pub fn run_dot_product_benchmarks() -> Vec<DotProductBenchmarkResult> {
         let scalar_duration = start_scalar.elapsed();
         let scalar_ns = (scalar_duration.as_nanos() as f64) / (iters as f64);
 
-        let speedup = if simd_ns > 0.0 { scalar_ns / simd_ns } else { 1.0 };
+        let speedup = if simd_ns > 0.0 {
+            scalar_ns / simd_ns
+        } else {
+            1.0
+        };
 
         results.push(DotProductBenchmarkResult {
             vector_size: size,
@@ -171,10 +179,21 @@ pub fn run_gemv_benchmarks() -> Vec<GemvBenchmarkResult> {
         let (int4_g32_q, int4_g32_scales) = quantize_int4_group(&weights, 32);
         let start_int4_g32 = Instant::now();
         for _ in 0..iters_int4 {
-            let _ = gemv_int4(&int4_g32_q, &int4_g32_scales, 32, rows, cols, None, &x, &mut y);
+            let _ = gemv_int4(
+                &int4_g32_q,
+                &int4_g32_scales,
+                32,
+                rows,
+                cols,
+                None,
+                &x,
+                &mut y,
+            );
         }
-        let int4_g32_latency_us = (start_int4_g32.elapsed().as_micros() as f64) / (iters_int4 as f64);
-        let int4_g32_bytes = (int4_g32_q.len() + int4_g32_scales.len() + (cols * 4) + (rows * 4)) as f64;
+        let int4_g32_latency_us =
+            (start_int4_g32.elapsed().as_micros() as f64) / (iters_int4 as f64);
+        let int4_g32_bytes =
+            (int4_g32_q.len() + int4_g32_scales.len() + (cols * 4) + (rows * 4)) as f64;
         let int4_g32_bw = (int4_g32_bytes / (int4_g32_latency_us * 1e-6)) / 1e9;
         let int4_g32_gflops = (ops / (int4_g32_latency_us * 1e-6)) / 1e9;
 

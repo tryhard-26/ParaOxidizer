@@ -1,6 +1,8 @@
-use pyo3::prelude::*;
-use pyo3::exceptions::PyRuntimeError;
+#![allow(clippy::useless_conversion)]
+
 use paraoxidizer_cli::commands;
+use pyo3::exceptions::PyRuntimeError;
+use pyo3::prelude::*;
 
 /// Quantize a Hugging Face model or SafeTensors file to .pox format
 #[pyfunction]

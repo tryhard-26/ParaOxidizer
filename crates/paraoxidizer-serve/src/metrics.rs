@@ -21,8 +21,10 @@ impl Default for ServerMetrics {
 impl ServerMetrics {
     pub fn record_request(&self, tokens: u64, latency_ms: u64) {
         self.requests_total.fetch_add(1, Ordering::Relaxed);
-        self.tokens_generated_total.fetch_add(tokens, Ordering::Relaxed);
-        self.total_latency_ms.fetch_add(latency_ms, Ordering::Relaxed);
+        self.tokens_generated_total
+            .fetch_add(tokens, Ordering::Relaxed);
+        self.total_latency_ms
+            .fetch_add(latency_ms, Ordering::Relaxed);
     }
 
     pub fn to_prometheus_text(&self) -> String {

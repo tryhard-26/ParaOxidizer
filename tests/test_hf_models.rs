@@ -1,6 +1,8 @@
 mod common;
 
-use common::{create_hf_llama_model, create_hf_mistral_model, create_hf_qwen_model, create_hf_sharded_model};
+use common::{
+    create_hf_llama_model, create_hf_mistral_model, create_hf_qwen_model, create_hf_sharded_model,
+};
 use paraoxidizer::cli::commands;
 use paraoxidizer::format::HfModel;
 use paraoxidizer::format::PoxFile;
@@ -14,7 +16,10 @@ fn test_hf_llama_pipeline() {
 
     // 1. Ingestion check
     let hf = HfModel::load(&model_dir).unwrap();
-    assert_eq!(hf.model_config.architecture, paraoxidizer::core::ModelArchitecture::Llama);
+    assert_eq!(
+        hf.model_config.architecture,
+        paraoxidizer::core::ModelArchitecture::Llama
+    );
     assert!(hf.tensors.len() >= 20);
 
     // 2. Inspection command
@@ -105,7 +110,10 @@ fn test_hf_qwen_and_mistral() {
     let qwen_dir = tmp.path().join("qwen_hf");
     create_hf_qwen_model(&qwen_dir);
     let qwen = HfModel::load(&qwen_dir).unwrap();
-    assert_eq!(qwen.model_config.architecture, paraoxidizer::core::ModelArchitecture::Qwen);
+    assert_eq!(
+        qwen.model_config.architecture,
+        paraoxidizer::core::ModelArchitecture::Qwen
+    );
 
     let qwen_pox = tmp.path().join("qwen.pox");
     commands::run_quantize(
@@ -124,7 +132,10 @@ fn test_hf_qwen_and_mistral() {
     let mistral_dir = tmp.path().join("mistral_hf");
     create_hf_mistral_model(&mistral_dir);
     let mistral = HfModel::load(&mistral_dir).unwrap();
-    assert_eq!(mistral.model_config.architecture, paraoxidizer::core::ModelArchitecture::Mistral);
+    assert_eq!(
+        mistral.model_config.architecture,
+        paraoxidizer::core::ModelArchitecture::Mistral
+    );
 
     let mistral_pox = tmp.path().join("mistral.pox");
     commands::run_quantize(
@@ -156,7 +167,12 @@ fn test_hf_sharded_model() {
     // Verify index parsing and loading from multiple shards
     let hf = HfModel::load(&sharded_dir).unwrap();
     assert!(hf.tensors.contains_key("model.embed_tokens.weight"));
-    assert!(hf.tensors.contains_key("model.layers.0.q_proj.weight") || hf.tensors.contains_key("model.layers.0.self_attn.q_proj.weight"));
+    assert!(
+        hf.tensors.contains_key("model.layers.0.q_proj.weight")
+            || hf
+                .tensors
+                .contains_key("model.layers.0.self_attn.q_proj.weight")
+    );
     assert!(hf.tensors.contains_key("lm_head.weight"));
 
     let out_pox = tmp.path().join("sharded.pox");
@@ -214,7 +230,10 @@ fn test_huggingface_hub_direct_remote_fetch() {
 
     // Ingest directly from Hugging Face Hub
     let hf = HfModel::load(repo_id).unwrap();
-    assert_eq!(hf.model_config.architecture, paraoxidizer::core::ModelArchitecture::Llama);
+    assert_eq!(
+        hf.model_config.architecture,
+        paraoxidizer::core::ModelArchitecture::Llama
+    );
     assert_eq!(hf.tensors.len(), 21);
 
     // Run CLI inspect on remote repo ID

@@ -54,10 +54,7 @@ impl SparseOutlierTable {
     }
 
     /// Extract outliers from a mutable slice of f32 weights, replacing them with 0.0 in-place
-    pub fn extract_and_zero_outliers(
-        weights: &mut [f32],
-        policy: OutlierPolicy,
-    ) -> Option<Self> {
+    pub fn extract_and_zero_outliers(weights: &mut [f32], policy: OutlierPolicy) -> Option<Self> {
         let sigma_mult = policy.sigma_threshold()?;
         if weights.is_empty() {
             return None;

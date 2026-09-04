@@ -12,12 +12,12 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Cell, Gauge, Paragraph, Row, Sparkline, Table},
     Terminal,
 };
-use sysinfo::System;
 use std::{
     io,
     path::Path,
     time::{Duration, Instant},
 };
+use sysinfo::System;
 
 pub struct MonitorState {
     pub model_path: Option<String>,
@@ -71,8 +71,8 @@ impl MonitorState {
                 175, 178, 176, 180, 182, 185, 184, 188, 190, 192, 191, 195,
             ],
             latency_history: vec![
-                18, 17, 18, 16, 17, 16, 15, 16, 15, 15, 14, 15, 14, 14, 13, 14, 13, 13, 12, 13,
-                12, 12, 11, 12, 11, 11, 10, 11,
+                18, 17, 18, 16, 17, 16, 15, 16, 15, 15, 14, 15, 14, 14, 13, 14, 13, 13, 12, 13, 12,
+                12, 11, 12, 11, 11, 10, 11,
             ],
             ttft_ms: 12.4,
             tps: 184.6,
@@ -186,22 +186,18 @@ fn render_ui(f: &mut ratatui::Frame, state: &MonitorState) {
             Style::default().fg(Color::Green),
         ),
     ])];
-    let header = Paragraph::new(header_text)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(Color::Cyan)),
-        );
+    let header = Paragraph::new(header_text).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(Color::Cyan)),
+    );
     f.render_widget(header, chunks[0]);
 
     // 2. Gauges (RAM & KV Cache)
     let gauge_chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(50),
-            Constraint::Percentage(50),
-        ])
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(chunks[1]);
 
     let total_mem = state.system.total_memory() / (1024 * 1024);
@@ -255,10 +251,7 @@ fn render_ui(f: &mut ratatui::Frame, state: &MonitorState) {
     // 3. Telemetry Sparklines
     let stat_chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(50),
-            Constraint::Percentage(50),
-        ])
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(chunks[2]);
 
     let sparkline_tps = Sparkline::default()
@@ -276,7 +269,10 @@ fn render_ui(f: &mut ratatui::Frame, state: &MonitorState) {
     let sparkline_lat = Sparkline::default()
         .block(
             Block::default()
-                .title(format!(" Time to First Token (TTFT): {:.1} ms ", state.ttft_ms))
+                .title(format!(
+                    " Time to First Token (TTFT): {:.1} ms ",
+                    state.ttft_ms
+                ))
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
                 .border_style(Style::default().fg(Color::Yellow)),
@@ -335,13 +331,18 @@ fn render_ui(f: &mut ratatui::Frame, state: &MonitorState) {
         ],
     )
     .header(
-        Row::new(vec!["Component", "Configuration / Mode", "Detail", "Status"])
-            .style(
-                Style::default()
-                    .fg(Color::White)
-                    .add_modifier(Modifier::BOLD),
-            )
-            .bottom_margin(1),
+        Row::new(vec![
+            "Component",
+            "Configuration / Mode",
+            "Detail",
+            "Status",
+        ])
+        .style(
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        )
+        .bottom_margin(1),
     )
     .block(
         Block::default()
@@ -354,20 +355,35 @@ fn render_ui(f: &mut ratatui::Frame, state: &MonitorState) {
 
     // 5. Footer Controls
     let footer_text = Line::from(vec![
-        Span::styled(" [Q / ESC] ", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            " [Q / ESC] ",
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+        ),
         Span::raw("Quit  "),
-        Span::styled(" [R] ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            " [R] ",
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::raw("Force Telemetry Refresh  "),
-        Span::styled(" [TAB] ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            " [TAB] ",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::raw("Switch View  "),
-        Span::styled("  ParaOxidizer v0.1.0 ", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            "  ParaOxidizer v0.1.0 ",
+            Style::default().fg(Color::DarkGray),
+        ),
     ]);
-    let footer = Paragraph::new(footer_text)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(Color::DarkGray)),
-        );
+    let footer = Paragraph::new(footer_text).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(Color::DarkGray)),
+    );
     f.render_widget(footer, chunks[4]);
 }

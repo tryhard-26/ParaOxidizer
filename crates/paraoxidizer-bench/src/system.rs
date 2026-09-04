@@ -155,7 +155,8 @@ pub fn run_system_benchmarks() -> Vec<SystemBenchmarkResult> {
         let pubkey_hex = keypair.public_key_hex();
         let start_verify = Instant::now();
         for _ in 0..iters {
-            let ok = paraoxidizer_security::verify_signature_hex(&message, &pubkey_hex, &sig).unwrap();
+            let ok =
+                paraoxidizer_security::verify_signature_hex(&message, &pubkey_hex, &sig).unwrap();
             std::hint::black_box(ok);
         }
         let verify_us = (start_verify.elapsed().as_micros() as f64) / (iters as f64);

@@ -3,7 +3,11 @@ use paraoxidizer_core::error::{PoxError, Result};
 use paraoxidizer_format::poxcal::{LayerActivationStats, PoxCalArtifact};
 use rand::Rng;
 use sha2::{Digest, Sha256};
-use std::{fs::File, io::{BufRead, BufReader}, path::Path};
+use std::{
+    fs::File,
+    io::{BufRead, BufReader},
+    path::Path,
+};
 
 /// Engine for recording activation statistics across layers
 pub struct CalibrationEngine {
