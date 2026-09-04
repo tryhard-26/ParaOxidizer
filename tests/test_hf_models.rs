@@ -81,6 +81,8 @@ fn test_hf_llama_pipeline() {
         "Explain memory safety in Rust.",
         16,
         0.7,
+        None,
+        3,
     )
     .unwrap();
 

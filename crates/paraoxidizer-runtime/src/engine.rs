@@ -340,4 +340,207 @@ impl PoxEngine {
 
         Ok(full_text)
     }
+
+    /// Speculative decoding loop: Uses a lightweight draft engine to generate K speculative candidate tokens,
+    /// which are verified in batched passes by the target engine.
+    /// Returns: (generated_text, total_drafted_tokens, total_accepted_tokens, acceptance_rate)
+    pub fn generate_speculative<F>(
+        &self,
+        draft_engine: &PoxEngine,
+        prompt: &str,
+        max_new_tokens: usize,
+        lookahead_k: usize,
+        sampler_config: SamplerConfig,
+        mut token_callback: F,
+    ) -> Result<(String, usize, usize, f64)>
+    where
+        F: FnMut(&str) -> bool,
+    {
+        let prompt_tokens = self.tokenizer.encode(prompt);
+        if prompt_tokens.is_empty() {
+            return Ok((String::new(), 0, 0, 1.0));
+        }
+
+        let k = lookahead_k.clamp(1, 8);
+        let max_seq = prompt_tokens.len() + max_new_tokens + 64;
+
+        let mut target_kv = KvCache::new(
+            self.config.num_hidden_layers,
+            self.config.num_key_value_heads,
+            self.config.head_dim(),
+            max_seq,
+        );
+
+        let mut draft_kv = KvCache::new(
+            draft_engine.config.num_hidden_layers,
+            draft_engine.config.num_key_value_heads,
+            draft_engine.config.head_dim(),
+            max_seq,
+        );
+
+        let sampler = Sampler::new(sampler_config);
+        let mut generated_tokens = Vec::new();
+
+        // Prefill prompt on both target and draft engines
+        let mut target_last_logits = Vec::new();
+        for (pos, &tok) in prompt_tokens.iter().enumerate() {
+            target_last_logits = self.forward_token(tok, pos, &mut target_kv)?;
+            let _ = draft_engine.forward_token(tok, pos, &mut draft_kv)?;
+        }
+
+        let mut full_text = String::new();
+        let mut total_drafted = 0;
+        let mut total_accepted = 0;
+        let mut current_pos = prompt_tokens.len();
+
+        while generated_tokens.len() < max_new_tokens {
+            // 1. Draft engine generates K candidate tokens
+            let mut draft_candidates = Vec::with_capacity(k);
+            let mut draft_logits = target_last_logits.clone();
+
+            for step in 0..k {
+                let candidate = sampler.sample(&mut draft_logits, &generated_tokens);
+                draft_candidates.push(candidate);
+                total_drafted += 1;
+
+                if candidate == self.config.eos_token_id || candidate == self.tokenizer.eos_id {
+                    break;
+                }
+
+                draft_logits = draft_engine.forward_token(candidate, current_pos + step, &mut draft_kv)?;
+            }
+
+            // 2. Target engine verifies candidate tokens
+            let mut next_target_logits = target_last_logits.clone();
+
+            for &candidate in &draft_candidates {
+                let target_pred = sampler.sample(&mut next_target_logits, &generated_tokens);
+
+                if target_pred == candidate {
+                    total_accepted += 1;
+                    generated_tokens.push(candidate);
+                    let piece = self.tokenizer.decode(&[candidate]);
+                    if !piece.is_empty() {
+                        full_text.push_str(&piece);
+                        if !token_callback(&piece) {
+                            break;
+                        }
+                    }
+                    if candidate == self.config.eos_token_id || candidate == self.tokenizer.eos_id {
+                        break;
+                    }
+                    next_target_logits = self.forward_token(candidate, current_pos, &mut target_kv)?;
+                    current_pos += 1;
+                } else {
+                    generated_tokens.push(target_pred);
+                    let piece = self.tokenizer.decode(&[target_pred]);
+                    if !piece.is_empty() {
+                        full_text.push_str(&piece);
+                        if !token_callback(&piece) {
+                            break;
+                        }
+                    }
+                    if target_pred == self.config.eos_token_id || target_pred == self.tokenizer.eos_id {
+                        break;
+                    }
+                    next_target_logits = self.forward_token(target_pred, current_pos, &mut target_kv)?;
+                    current_pos += 1;
+                    break;
+                }
+            }
+
+            target_last_logits = next_target_logits;
+
+            if generated_tokens.last().copied() == Some(self.config.eos_token_id)
+                || generated_tokens.last().copied() == Some(self.tokenizer.eos_id)
+            {
+                break;
+            }
+        }
+
+        let rate = if total_drafted > 0 {
+            (total_accepted as f64) / (total_drafted as f64)
+        } else {
+            1.0
+        };
+
+        Ok((full_text, total_drafted, total_accepted, rate))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use paraoxidizer_core::arch::{ModelArchitecture, ModelConfig};
+    use paraoxidizer_format::pox::{PoxMetadata, PoxQuantPlanRecord, PoxWriter};
+    use std::collections::HashMap;
+
+    fn create_mock_engine(hidden_size: usize, num_layers: usize) -> PoxEngine {
+        let config = ModelConfig {
+            architecture: ModelArchitecture::Llama,
+            hidden_size,
+            intermediate_size: hidden_size * 2,
+            num_hidden_layers: num_layers,
+            num_attention_heads: 4,
+            num_key_value_heads: 2,
+            vocab_size: 256,
+            max_position_embeddings: 512,
+            rms_norm_eps: 1e-5,
+            rope_theta: 10000.0,
+            tie_word_embeddings: false,
+            eos_token_id: 2,
+            bos_token_id: 1,
+        };
+
+        let metadata = PoxMetadata {
+            model_config: config.clone(),
+            total_parameters: 10000,
+            quantized_by: "Test".into(),
+            timestamp_utc: 0,
+            original_format: "Test".into(),
+            base_model_name: "Mock".into(),
+        };
+
+        let quant_plan = PoxQuantPlanRecord {
+            default_precision: "INT4".into(),
+            group_size: 128,
+            outlier_strategy: "fp16".into(),
+            layer_assignments: HashMap::new(),
+        };
+
+        let writer = PoxWriter::new(metadata, quant_plan, "test-run".into());
+        let bytes = writer.write_to_bytes().expect("write_to_bytes");
+        let pox_file = PoxFile::from_bytes(&bytes).expect("PoxFile::from_bytes");
+
+        PoxEngine::new(pox_file)
+    }
+
+    #[test]
+    fn test_speculative_decoding() {
+        let target_engine = create_mock_engine(128, 2);
+        let draft_engine = create_mock_engine(64, 1);
+
+        let sampler = SamplerConfig {
+            temperature: 0.7,
+            top_k: 40,
+            top_p: 0.9,
+            repetition_penalty: 1.1,
+            ..Default::default()
+        };
+
+        let (text, drafted, _accepted, rate) = target_engine
+            .generate_speculative(
+                &draft_engine,
+                "Hello world",
+                16,
+                3,
+                sampler,
+                |_piece| true,
+            )
+            .unwrap();
+
+        assert!(!text.is_empty());
+        assert!(drafted > 0);
+        assert!((0.0..=1.0).contains(&rate));
+    }
 }

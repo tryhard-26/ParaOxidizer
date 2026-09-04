@@ -7,6 +7,7 @@ use paraoxidizer::quant::kernels::{
 use paraoxidizer::runtime::{KvCache, PoxEngine};
 use tempfile::tempdir;
 
+#[allow(dead_code)]
 #[derive(Debug)]
 struct RealModelBenchmarkResult {
     model_name: &'static str,

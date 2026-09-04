@@ -125,6 +125,10 @@ pub enum Commands {
         max_tokens: usize,
         #[arg(long, default_value = "0.7", help = "Sampling temperature")]
         temperature: f32,
+        #[arg(long, help = "Optional draft model path for speculative decoding")]
+        draft: Option<String>,
+        #[arg(long, default_value = "3", help = "Speculative lookahead K candidate tokens")]
+        lookahead: usize,
     },
 
     #[command(about = "Launch OpenAI-compatible HTTP server (/v1/chat/completions, /metrics)")]
@@ -135,6 +139,16 @@ pub enum Commands {
         host: String,
         #[arg(long, default_value = "8080", help = "Bind port")]
         port: u16,
+        #[arg(long, help = "Optional draft model path for speculative decoding")]
+        draft: Option<String>,
+    },
+
+    #[command(about = "Launch interactive terminal TUI dashboard for real-time inference telemetry and memory")]
+    Monitor {
+        #[arg(help = "Optional path to .pox model file")]
+        model: Option<String>,
+        #[arg(long, default_value = "500", help = "Refresh interval in milliseconds")]
+        interval_ms: u64,
     },
 
     #[command(about = "Sign a .pox artifact with an Ed25519 private key")]

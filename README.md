@@ -125,6 +125,25 @@ curl http://127.0.0.1:8080/v1/chat/completions \
   }'
 ```
 
+#### Interactive Inference & Speculative Decoding (`pox run`)
+Execute instant interactive inference directly in your terminal, with support for multi-engine speculative decoding:
+```bash
+# Standard autoregressive streaming inference
+pox run llama3-8b.pox --prompt "What is zero-copy memory mapping?"
+
+# Multi-engine speculative decoding (Draft model + Target model verification)
+pox run target-llama3-8b.pox \
+  --draft draft-llama3-1b.pox \
+  --lookahead 3 \
+  --temperature 0.7
+```
+
+#### Terminal TUI Monitor (`pox monitor`)
+Launch an interactive real-time terminal dashboard (`ratatui`) to inspect memory consumption, PagedAttention KV-cache block allocation, and live token throughput:
+```bash
+pox monitor llama3-8b.pox
+```
+
 ---
 
 ### Declarative Pipeline (`paraoxidizer.toml`)

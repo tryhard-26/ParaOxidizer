@@ -2,6 +2,7 @@
 
 pub mod args;
 pub mod commands;
+pub mod monitor;
 
 use args::{Cli, Commands};
 use clap::Parser;
@@ -86,11 +87,28 @@ pub async fn run() -> anyhow::Result<()> {
             prompt,
             max_tokens,
             temperature,
+            draft,
+            lookahead,
         } => {
-            commands::run_inference(&model, &prompt, max_tokens, temperature)?;
+            commands::run_inference(
+                &model,
+                &prompt,
+                max_tokens,
+                temperature,
+                draft.as_deref(),
+                lookahead,
+            )?;
         }
-        Commands::Serve { model, host, port } => {
+        Commands::Serve {
+            model,
+            host,
+            port,
+            draft: _,
+        } => {
             commands::run_serve_command(&model, &host, port).await?;
+        }
+        Commands::Monitor { model, interval_ms } => {
+            commands::run_monitor(model.as_deref(), interval_ms)?;
         }
         Commands::Sign { model, key, output } => {
             commands::run_sign(&model, &key, output.as_deref())?;

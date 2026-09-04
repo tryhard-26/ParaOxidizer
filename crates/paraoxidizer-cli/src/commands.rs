@@ -794,6 +794,8 @@ pub fn run_inference(
     prompt: &str,
     max_tokens: usize,
     temperature: f32,
+    draft_path: Option<&str>,
+    lookahead: usize,
 ) -> Result<()> {
     let pox = PoxFile::open(model_path)?;
     let engine = PoxEngine::new(pox);
@@ -807,16 +809,52 @@ pub fn run_inference(
     };
 
     println!("\n{}: {}", "Prompt".bold().cyan(), prompt);
-    print!("{}: ", "Response".bold().green());
-    std::io::stdout().flush().unwrap();
+    if let Some(draft_file) = draft_path {
+        println!(
+            "{}: Speculative Decoding engaged (Draft: {}, Lookahead K={})",
+            "Engine Mode".bold().magenta(),
+            draft_file.yellow(),
+            lookahead
+        );
+        let draft_pox = PoxFile::open(draft_file)?;
+        let draft_engine = PoxEngine::new(draft_pox);
 
-    let _ = engine.generate_stream(prompt, max_tokens, sampler, |piece| {
-        print!("{}", piece);
+        print!("{}: ", "Response".bold().green());
         std::io::stdout().flush().unwrap();
-        true
-    })?;
 
-    println!();
+        let (_text, drafted, accepted, rate) = engine.generate_speculative(
+            &draft_engine,
+            prompt,
+            max_tokens,
+            lookahead,
+            sampler,
+            |piece| {
+                print!("{}", piece);
+                std::io::stdout().flush().unwrap();
+                true
+            },
+        )?;
+
+        println!();
+        println!(
+            "\n{}: Drafted Tokens={}, Accepted Tokens={}, Acceptance Rate={:.1}%",
+            "Speculative Telemetry".bold().cyan(),
+            drafted,
+            accepted,
+            rate * 100.0
+        );
+    } else {
+        print!("{}: ", "Response".bold().green());
+        std::io::stdout().flush().unwrap();
+
+        let _ = engine.generate_stream(prompt, max_tokens, sampler, |piece| {
+            print!("{}", piece);
+            std::io::stdout().flush().unwrap();
+            true
+        })?;
+
+        println!();
+    }
     Ok(())
 }
 
@@ -1006,3 +1044,9 @@ pub fn run_keygen(output_prefix: &str) -> Result<()> {
 
     Ok(())
 }
+
+pub fn run_monitor(model_path: Option<&str>, refresh_ms: u64) -> Result<()> {
+    crate::monitor::run_interactive_monitor(model_path.map(|s| s.to_string()), refresh_ms)
+        .map_err(|e| PoxError::Runtime(e.to_string()))
+}
+
