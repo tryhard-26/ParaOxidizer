@@ -25,9 +25,14 @@ tempfile = "3.10"
 sha2 = "0.10"
 rand = "0.8"
 hex = "0.4"
+ureq = "2.10"
 
 [[bin]]
 name = "pox-bench"
 path = "src/bin/pox_bench.rs"
+
+[[bin]]
+name = "bench-production-models"
+path = "src/bin/bench_production_models.rs"
 
 
