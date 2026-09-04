@@ -1,6 +1,6 @@
 [package]
 name = "paraoxidizer-quant"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Adriteyo Das <das.adriteyo26@gmail.com>"]
 description = "Quantization kernels, group-wise INT4/INT8, outlier tables, and SIMD acceleration"
@@ -9,7 +9,7 @@ repository = "https://github.com/tryhard-26/ParaOxidizer"
 homepage = "https://github.com/tryhard-26/ParaOxidizer"
 
 [dependencies]
-paraoxidizer-core = { path = "../paraoxidizer-core", version = "0.1.0" }
+paraoxidizer-core = { path = "../paraoxidizer-core", version = "0.1.1" }
 half = { version = "2.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

@@ -1,6 +1,6 @@
 [package]
 name = "paraoxidizer-core"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Adriteyo Das <das.adriteyo26@gmail.com>"]
 description = "Core types, architectures, hardware detection, and configuration for ParaOxidizer"

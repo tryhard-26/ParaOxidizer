@@ -1260,7 +1260,7 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
 name = "paraoxidizer"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "axum",
@@ -1286,7 +1286,7 @@ dependencies = [
 
 [[package]]
 name = "paraoxidizer-bench"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "colored",
  "comfy-table",
@@ -1308,7 +1308,7 @@ dependencies = [
 
 [[package]]
 name = "paraoxidizer-calibration"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "hex",
  "paraoxidizer-core",
@@ -1323,7 +1323,7 @@ dependencies = [
 
 [[package]]
 name = "paraoxidizer-cli"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -1352,7 +1352,7 @@ dependencies = [
 
 [[package]]
 name = "paraoxidizer-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "half",
  "serde",
@@ -1364,7 +1364,7 @@ dependencies = [
 
 [[package]]
 name = "paraoxidizer-format"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "byteorder",
  "half",
@@ -1382,7 +1382,7 @@ dependencies = [
 
 [[package]]
 name = "paraoxidizer-optimizer"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "paraoxidizer-calibration",
  "paraoxidizer-core",
@@ -1395,7 +1395,7 @@ dependencies = [
 
 [[package]]
 name = "paraoxidizer-py"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "paraoxidizer-cli",
  "paraoxidizer-core",
@@ -1406,7 +1406,7 @@ dependencies = [
 
 [[package]]
 name = "paraoxidizer-quant"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "byteorder",
  "half",
@@ -1418,7 +1418,7 @@ dependencies = [
 
 [[package]]
 name = "paraoxidizer-runtime"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "half",
  "metal",
@@ -1433,7 +1433,7 @@ dependencies = [
 
 [[package]]
 name = "paraoxidizer-security"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "ed25519-dalek",
  "hex",
@@ -1448,7 +1448,7 @@ dependencies = [
 
 [[package]]
 name = "paraoxidizer-serve"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "axum",
  "futures",

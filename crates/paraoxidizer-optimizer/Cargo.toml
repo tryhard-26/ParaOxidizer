@@ -1,6 +1,6 @@
 [package]
 name = "paraoxidizer-optimizer"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Adriteyo Das <das.adriteyo26@gmail.com>"]
 description = "Adaptive mixed-precision optimizer and Pareto frontier solver"
@@ -9,9 +9,9 @@ repository = "https://github.com/tryhard-26/ParaOxidizer"
 homepage = "https://github.com/tryhard-26/ParaOxidizer"
 
 [dependencies]
-paraoxidizer-core = { path = "../paraoxidizer-core", version = "0.1.0" }
-paraoxidizer-calibration = { path = "../paraoxidizer-calibration", version = "0.1.0" }
-paraoxidizer-format = { path = "../paraoxidizer-format", version = "0.1.0" }
+paraoxidizer-core = { path = "../paraoxidizer-core", version = "0.1.1" }
+paraoxidizer-calibration = { path = "../paraoxidizer-calibration", version = "0.1.1" }
+paraoxidizer-format = { path = "../paraoxidizer-format", version = "0.1.1" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 rand = "0.8"

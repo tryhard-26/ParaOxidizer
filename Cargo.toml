@@ -1,6 +1,6 @@
 [package]
 name = "paraoxidizer"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Adriteyo Das <das.adriteyo26@gmail.com>"]
 description = "Parameter Oxidizer — a Rust-native LLM quantization, optimization, verification, and inference toolkit"
@@ -28,16 +28,16 @@ members = [
 resolver = "2"
 
 [dependencies]
-paraoxidizer-core = { path = "crates/paraoxidizer-core", version = "0.1.0" }
-paraoxidizer-format = { path = "crates/paraoxidizer-format", version = "0.1.0" }
-paraoxidizer-quant = { path = "crates/paraoxidizer-quant", version = "0.1.0" }
-paraoxidizer-calibration = { path = "crates/paraoxidizer-calibration", version = "0.1.0" }
-paraoxidizer-optimizer = { path = "crates/paraoxidizer-optimizer", version = "0.1.0" }
-paraoxidizer-security = { path = "crates/paraoxidizer-security", version = "0.1.0" }
-paraoxidizer-runtime = { path = "crates/paraoxidizer-runtime", version = "0.1.0" }
-paraoxidizer-serve = { path = "crates/paraoxidizer-serve", version = "0.1.0" }
-paraoxidizer-bench = { path = "crates/paraoxidizer-bench", version = "0.1.0" }
-paraoxidizer-cli = { path = "crates/paraoxidizer-cli", version = "0.1.0" }
+paraoxidizer-core = { path = "crates/paraoxidizer-core", version = "0.1.1" }
+paraoxidizer-format = { path = "crates/paraoxidizer-format", version = "0.1.1" }
+paraoxidizer-quant = { path = "crates/paraoxidizer-quant", version = "0.1.1" }
+paraoxidizer-calibration = { path = "crates/paraoxidizer-calibration", version = "0.1.1" }
+paraoxidizer-optimizer = { path = "crates/paraoxidizer-optimizer", version = "0.1.1" }
+paraoxidizer-security = { path = "crates/paraoxidizer-security", version = "0.1.1" }
+paraoxidizer-runtime = { path = "crates/paraoxidizer-runtime", version = "0.1.1" }
+paraoxidizer-serve = { path = "crates/paraoxidizer-serve", version = "0.1.1" }
+paraoxidizer-bench = { path = "crates/paraoxidizer-bench", version = "0.1.1" }
+paraoxidizer-cli = { path = "crates/paraoxidizer-cli", version = "0.1.1" }
 
 clap = { version = "4.5", features = ["derive", "cargo", "env"] }
 tokio = { version = "1.39", features = ["full"] }

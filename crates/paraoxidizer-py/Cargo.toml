@@ -1,6 +1,6 @@
 [package]
 name = "paraoxidizer-py"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Adriteyo Das <das.adriteyo26@gmail.com>"]
 description = "Python bindings for ParaOxidizer LLM quantization and verification"
@@ -15,8 +15,8 @@ crate-type = ["cdylib"]
 test = false
 
 [dependencies]
-paraoxidizer-core = { path = "../paraoxidizer-core", version = "0.1.0" }
-paraoxidizer-format = { path = "../paraoxidizer-format", version = "0.1.0" }
-paraoxidizer-quant = { path = "../paraoxidizer-quant", version = "0.1.0" }
-paraoxidizer-cli = { path = "../paraoxidizer-cli", version = "0.1.0" }
+paraoxidizer-core = { path = "../paraoxidizer-core", version = "0.1.1" }
+paraoxidizer-format = { path = "../paraoxidizer-format", version = "0.1.1" }
+paraoxidizer-quant = { path = "../paraoxidizer-quant", version = "0.1.1" }
+paraoxidizer-cli = { path = "../paraoxidizer-cli", version = "0.1.1" }
 pyo3 = { version = "0.22", features = ["extension-module"] }

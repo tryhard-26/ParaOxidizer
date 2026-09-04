@@ -1,6 +1,6 @@
 [package]
 name = "paraoxidizer-format"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Adriteyo Das <das.adriteyo26@gmail.com>"]
 description = "Model file formats for ParaOxidizer: native .pox container, SafeTensors, and GGUF"
@@ -9,7 +9,7 @@ repository = "https://github.com/tryhard-26/ParaOxidizer"
 homepage = "https://github.com/tryhard-26/ParaOxidizer"
 
 [dependencies]
-paraoxidizer-core = { path = "../paraoxidizer-core", version = "0.1.0" }
+paraoxidizer-core = { path = "../paraoxidizer-core", version = "0.1.1" }
 memmap2 = "0.9"
 safetensors = "0.4"
 serde = { version = "1.0", features = ["derive"] }
