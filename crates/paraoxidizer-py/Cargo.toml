@@ -1,0 +1,22 @@
+[package]
+name = "paraoxidizer-py"
+version = "0.1.0"
+edition = "2021"
+authors = ["Adriteyo Das <das.adriteyo26@gmail.com>"]
+description = "Python bindings for ParaOxidizer LLM quantization and verification"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/tryhard-26/ParaOxidizer"
+homepage = "https://github.com/tryhard-26/ParaOxidizer"
+publish = false
+
+[lib]
+name = "pox"
+crate-type = ["cdylib"]
+test = false
+
+[dependencies]
+paraoxidizer-core = { path = "../paraoxidizer-core", version = "0.1.0" }
+paraoxidizer-format = { path = "../paraoxidizer-format", version = "0.1.0" }
+paraoxidizer-quant = { path = "../paraoxidizer-quant", version = "0.1.0" }
+paraoxidizer-cli = { path = "../paraoxidizer-cli", version = "0.1.0" }
+pyo3 = { version = "0.22", features = ["extension-module"] }
