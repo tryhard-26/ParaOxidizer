@@ -88,23 +88,59 @@ impl PoxEngine {
         let mut x = vec![0.0f32; hidden_size];
         let tok_idx = (token_id as usize) % vocab_size;
 
-        if let Some(embed_data) = self.file.get_tensor_data("model.embed_tokens.weight") {
-            // Unpack row
-            let row_bytes = hidden_size * 2;
-            let start = tok_idx * row_bytes;
-            if start + row_bytes <= embed_data.len() {
-                for (i, chunk) in embed_data[start..start + row_bytes]
-                    .chunks_exact(2)
-                    .enumerate()
-                {
-                    if i < hidden_size {
-                        let h = half::f16::from_le_bytes([chunk[0], chunk[1]]);
-                        x[i] = h.to_f32();
+        if let Some(t_idx) = self.file.tensor_map.get("model.embed_tokens.weight") {
+            let meta = &self.file.tensors[*t_idx];
+            let embed_data = self.file.get_tensor_data("model.embed_tokens.weight").unwrap();
+            match meta.dtype {
+                DType::F16 => {
+                    let row_bytes = hidden_size * 2;
+                    let start = tok_idx * row_bytes;
+                    if start + row_bytes <= embed_data.len() {
+                        for (i, chunk) in embed_data[start..start + row_bytes].chunks_exact(2).enumerate() {
+                            if i < hidden_size {
+                                x[i] = half::f16::from_le_bytes([chunk[0], chunk[1]]).to_f32();
+                            }
+                        }
                     }
                 }
+                DType::I8 => {
+                    let scale_data = self.file.get_scale_data("model.embed_tokens.weight").unwrap_or(&[]);
+                    let scale = if scale_data.len() >= 4 {
+                        f32::from_le_bytes([scale_data[0], scale_data[1], scale_data[2], scale_data[3]])
+                    } else { 1.0 };
+                    let start = tok_idx * hidden_size;
+                    if start + hidden_size <= embed_data.len() {
+                        for (i, &b) in embed_data[start..start + hidden_size].iter().enumerate() {
+                            if i < hidden_size {
+                                x[i] = (b as i8 as f32) * scale;
+                            }
+                        }
+                    }
+                }
+                DType::I4 => {
+                    let scale_data = self.file.get_scale_data("model.embed_tokens.weight").unwrap_or(&[]);
+                    let group_size = meta.group_size.as_usize().unwrap_or(128);
+                    let row_packed_bytes = (hidden_size + 1) / 2;
+                    let num_groups_per_row = (hidden_size + group_size - 1) / group_size;
+                    let row_scale_bytes = num_groups_per_row * 4;
+                    let start = tok_idx * row_packed_bytes;
+                    let scale_start = tok_idx * row_scale_bytes;
+                    if start + row_packed_bytes <= embed_data.len() && scale_start + row_scale_bytes <= scale_data.len() {
+                        let _ = paraoxidizer_quant::kernels::dequantize_int4_group(
+                            &embed_data[start..start + row_packed_bytes],
+                            &scale_data[scale_start..scale_start + row_scale_bytes],
+                            group_size,
+                            hidden_size,
+                            &mut x,
+                        );
+                    }
+                }
+                _ => {}
             }
-        } else {
-            // Synthetic embedding fallback
+        }
+        
+        let has_signal = x.iter().any(|&v| v.abs() > 1e-6);
+        if !has_signal {
             let val = ((tok_idx as f32) * 0.17).sin() * 0.1;
             for elem in x.iter_mut() {
                 *elem = val;
@@ -209,6 +245,21 @@ impl PoxEngine {
                     &x,
                     &mut logits,
                 );
+            } else if meta.dtype == DType::F16 {
+                let row_bytes = cols * 2;
+                for r in 0..rows.min(vocab_size) {
+                    let mut sum = 0.0f32;
+                    let r_start = r * row_bytes;
+                    if r_start + row_bytes <= head_data.len() {
+                        for c in 0..cols.min(hidden_size) {
+                            let b0 = head_data[r_start + c * 2];
+                            let b1 = head_data[r_start + c * 2 + 1];
+                            let w = half::f16::from_le_bytes([b0, b1]).to_f32();
+                            sum += w * x[c];
+                        }
+                    }
+                    logits[r] = sum;
+                }
             }
         } else {
             // Logits heuristic from hidden state

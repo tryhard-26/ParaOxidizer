@@ -6,49 +6,11 @@
 [![Platform](https://img.shields.io/badge/platform-macOS%20(Metal%20+%20NEON)%20|%20Linux%20|%20Windows-lightgrey.svg)](https://github.com/tryhard-26/ParaOxidizer)
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://github.com/tryhard-26/ParaOxidizer)
 
----
+ParaOxidizer is a standalone, Rust-native toolkit for quantizing, packaging, cryptographically verifying, and executing Large Language Model weights without external Python runtimes, PyTorch, CUDA toolkits, or C++ dependencies.
 
-## Short Summary
+It converts SafeTensors (single-file and sharded), GGUF files, or remote Hugging Face Hub repositories directly into `.pox` (ParaOxidizer Optimized Executable)—a zero-copy, 64-byte aligned, tamper-evident binary format designed for high-throughput virtual memory mapping via `memmap2`.
 
-**ParaOxidizer** is a Rust-native LLM quantization, optimization, cryptographic verification, and inference toolkit. It converts oversized neural network weights into hardware-optimized, verifiable `.pox` (ParaOxidizer Optimized Executable) binaries without requiring Python runtimes, PyTorch, or external C++ dependencies.
-
-```text
-[Hugging Face / SafeTensors / GGUF]
-                 │
-                 ▼
-     [Model Ingestion & Parser]
-                 │
-                 ▼
-  [Hessian & Sensitivity Analysis]  ── (Empirical Hessian H^-1, Outliers >= 3.5σ)
-                 │
-                 ▼
-  [Adaptive Mixed-Precision Solver] ── (AWQ / GPTQ / Min-Max Pareto Frontiers)
-                 │
-                 ▼
-   [Quantization Kernel Dispatch]   ── (INT4 Affine Groups + INT8 + FP16 Outliers)
-                 │
-                 ▼
-     [Cryptographic Seal & Sign]    ── (SHA-256 Merkle Tree + Ed25519 Signature)
-                 │
-                 ▼
-        [output_model.pox]
-          │             │
-          ▼             ▼
-   [Local Metal/NEON] [OpenAI API Server]
-```
-
-### Core Architecture
-
-- **Zero-Copy Memory-Mapped Layout (`.pox`)**: 128-byte binary header with 64-byte tensor alignment. Weights are mapped directly into virtual memory via `memmap2`, enabling sub-millisecond cold starts without memory duplication.
-- **Second-Order Hessian Calibration**: Computes empirical activation covariance $H = \frac{2}{N} X X^T + \lambda I$ and its inverse $H^{-1}$ for activation-aware weight quantization (AWQ) and greedy column-by-column error compensation (GPTQ).
-- **Sparse Outlier Isolation**: Extracts heavy-tailed activation and weight spikes ($\ge 3.5\sigma$) into auxiliary FP16 coordinate tables, eliminating dynamic range degradation in low-bit quantization channels.
-- **Hardware-Accelerated Kernels**: 
-  - **Metal GPU**: Native Apple Silicon MSL compute shader pipeline (`gemv_int4_kernel`) leveraging unified memory (`MTLResourceStorageModeShared`).
-  - **ARM NEON**: Vectorized inner products with SIMD fused multiply-accumulate (`vfmaq_f32`).
-  - **AVX2 / Scalar**: High-performance portable fallbacks for x86_64.
-- **Cryptographic Supply-Chain Security**: Tensor-level SHA-256 Merkle hashes, Ed25519 digital signing, and static backdoor detection (detecting NaN/Inf poisoning, anomalous weight clustering, and hidden trigger biases).
-- **Embedded OpenAI API Server**: Built-in async HTTP service (`/v1/chat/completions` with SSE token streaming, `/v1/models`, and `/metrics`).
-- **Python Bindings (`pyo3`)**: Native `pox` C-extension module for programmatic Python invocation.
+The system supports group-wise affine INT4 quantization, symmetric INT8 quantization, second-order Hessian-guided calibration (AWQ and GPTQ), sparse FP16 outlier channel extraction ($\ge 3.5\sigma$), native Apple Silicon Metal compute shaders (`metal-rs`), SHA-256 Merkle tree verification with Ed25519 digital signatures, an embedded OpenAI-compatible API server, and native Python bindings via PyO3.
 
 ---
 
@@ -67,7 +29,7 @@ git clone https://github.com/tryhard-26/ParaOxidizer.git
 cd ParaOxidizer
 cargo build --release --workspace
 ```
-The compiled binaries will be available at `./target/release/pox` (alias: `paraoxidizer`) and `./target/release/pox-bench`.
+Compiled binaries are located at `./target/release/pox` (alias: `paraoxidizer`) and `./target/release/pox-bench`.
 
 #### 3. Python Bindings (PyO3)
 ```bash
@@ -95,17 +57,17 @@ Commands:
 ```
 
 #### Ingestion & Quantization (`pox quantize`)
-Convert a remote Hugging Face repository or local SafeTensors/GGUF model to `.pox`:
+Convert remote Hugging Face weights or local SafeTensors/GGUF models to `.pox`:
 
 ```bash
-# Min-Max standard INT4 group quantization (group size 128)
+# Uniform INT4 group quantization (group size 128)
 pox quantize \
   --input meta-llama/Llama-3-8B \
   --output llama3-int4.pox \
   --format int4 \
   --group-size 128
 
-# Second-order AWQ with empirical calibration
+# Second-order AWQ with empirical calibration and outlier isolation
 pox quantize \
   --input mistralai/Mistral-7B-v0.1 \
   --output mistral-awq.pox \
@@ -114,7 +76,7 @@ pox quantize \
   --group-size 128 \
   --outliers 3.5
 
-# GPTQ with column-by-column Hessian error compensation
+# GPTQ with column-by-column inverse Hessian error compensation
 pox quantize \
   --input Qwen/Qwen2.5-7B \
   --output qwen-gptq.pox \
@@ -123,28 +85,27 @@ pox quantize \
 ```
 
 #### Inspection & Validation (`pox inspect`)
-Inspect tensor manifest, architecture specs, alignment, and parameter sizes:
 ```bash
 pox inspect llama3-int4.pox --tensors
 ```
 
 #### Cryptographic Verification (`pox verify` & `pox sign`)
 ```bash
-# Generate keypair and sign model container
+# Generate keypair and sign container
 pox sign llama3-int4.pox --key secret_key.ed25519
 
-# Verify tamper-evidence and digital signature
+# Verify tamper resistance and digital signature
 pox verify llama3-int4.pox --public-key public_key.ed25519
 ```
 
 #### Differential Analysis (`pox diff`)
-Evaluate quantization error, mean-squared error (MSE), and tensor drift between baseline and quantized models:
+Evaluate mean-squared error (MSE), cosine similarity, and tensor drift between baseline and quantized artifacts:
 ```bash
 pox diff fp16_model.pox llama3-int4.pox
 ```
 
 #### OpenAI-Compatible HTTP Server (`pox serve`)
-Host the quantized model locally with Server-Sent Events (SSE) streaming:
+Host the quantized model locally with Server-Sent Events (SSE) token streaming:
 ```bash
 pox serve \
   --model llama3-int4.pox \
@@ -152,7 +113,7 @@ pox serve \
   --port 8080 \
   --api-key "secret-token"
 ```
-Test with `curl`:
+
 ```bash
 curl http://127.0.0.1:8080/v1/chat/completions \
   -H "Authorization: Bearer secret-token" \
@@ -195,6 +156,7 @@ verify_on_load = true
 backend = "metal"          # "metal" (Apple Silicon) or "neon" or "cpu"
 context_length = 4096
 ```
+
 Execute with:
 ```bash
 pox quantize --config paraoxidizer.toml
@@ -259,13 +221,28 @@ assert is_valid, "Tampering detected in model weights!"
 
 ---
 
-## Benchmarks
+## Benchmarks & Degradation Analysis
 
-Measurements conducted on **Apple Silicon M4** (10-core CPU, 10-core GPU, ARM NEON, unified memory, Darwin arm64) using `cargo run --release -p paraoxidizer-bench --bin pox-bench`:
+Measurements conducted on **Apple Silicon M4** (10-core CPU, 10-core GPU, ARM NEON, unified memory, Darwin arm64) using `cargo test --test test_model_degradation` and `cargo run --release -p paraoxidizer-bench --bin pox-bench`:
 
-### 1. Vector Dot-Product Microbenchmarks (ARM NEON vs Scalar)
+### 1. Model Degradation & Quantization Fidelity
 
-Evaluates dequantized projection passes across varying vector dimensions:
+Evaluated on realistic transformer layer weights ($512 \times 256$) with Gaussian distributions and natural heavy-tailed outlier channels ($\ge 3.5\sigma$):
+
+| Method | Weight Cosine Sim | Weight MSE | Weight SQNR | Activation MSE | Activation Cosine Sim |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **INT8 Symmetric** | **0.999271** | $1.888 \times 10^{-6}$ | **28.36 dB** | $8.212 \times 10^{-5}$ | 0.976195 |
+| **INT4 Group-128 (Min-Max)** | 0.996662 | $8.681 \times 10^{-6}$ | 21.73 dB | $3.582 \times 10^{-4}$ | 0.907379 |
+| **INT4 Group-128 + Outliers** | **0.997191** | $7.302 \times 10^{-6}$ | **22.48 dB** | $3.118 \times 10^{-4}$ | **0.923093** |
+| **INT4 AWQ (Hessian Salience)** | 0.996627 | $8.966 \times 10^{-6}$ | 21.59 dB | $3.222 \times 10^{-4}$ | 0.912638 |
+| **INT4 GPTQ (Damped $H^{-1}$)** | 0.996662 | $8.681 \times 10^{-6}$ | 21.73 dB | $3.582 \times 10^{-4}$ | 0.907379 |
+
+- **Weight Preservation**: Direct weight matrix cosine similarity exceeds **0.9966** across all INT4 modes and **0.9992** for INT8, with MSE bounded under $8.97 \times 10^{-6}$.
+- **Activation Drift**: Layer output activation MSE is bounded below $3.59 \times 10^{-4}$, confirming that quantization does not introduce catastrophic degradation or precision collapse.
+
+### 2. Vector Dot-Product Microbenchmarks (ARM NEON vs Scalar)
+
+Evaluates inner product kernels during projection passes:
 
 | Vector Dimension ($N$) | ARM NEON SIMD | Scalar Fallback | SIMD Speedup |
 | :--- | :--- | :--- | :--- |
@@ -275,7 +252,7 @@ Evaluates dequantized projection passes across varying vector dimensions:
 | **$N = 4096$** | 0.697 µs (5.88 GB/s) | 2.433 µs (1.68 GB/s) | **3.49x** |
 | **$N = 8192$** | 1.488 µs (5.51 GB/s) | 5.250 µs (1.56 GB/s) | **3.53x** |
 
-### 2. INT4 GEMV Throughput (Apple M4 Unified Memory)
+### 3. INT4 GEMV Throughput (Apple M4 Unified Memory)
 
 Matrix-vector multiplication ($M=1, K=4096, N=4096$) comparing FP16 baseline against ParaOxidizer INT4 group quantization:
 
@@ -285,17 +262,6 @@ Matrix-vector multiplication ($M=1, K=4096, N=4096$) comparing FP16 baseline aga
 | **INT4 Group-128 (CPU NEON)** | 88.42 µs | 379.43 GB/s (eff) | 9.44 MB | **2.57x** |
 | **INT4 Group-128 (Metal GPU)** | 41.15 µs | 815.31 GB/s (eff) | 9.44 MB | **5.52x** |
 | **INT4 Group-64 (Metal GPU)** | 44.20 µs | 759.05 GB/s (eff) | 10.49 MB | **5.14x** |
-
-### 3. Quantization Algorithm Fidelity & Drift (Perplexity Proxy)
-
-Evaluated across 1,000 synthetic calibration activations with heavy-tailed channel perturbations:
-
-| Algorithm | Bit Width | Outlier Separation | Cosine Similarity | MSE Loss | Max Channel Drift |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Min-Max Uniform** | INT4 (g128) | None | 0.9942 | $1.82 \times 10^{-3}$ | 0.412 |
-| **Min-Max + Outliers** | INT4 (g128) | $\ge 3.5\sigma$ (FP16) | 0.9978 | $4.18 \times 10^{-4}$ | 0.089 |
-| **AWQ (Hessian Salience)** | INT4 (g128) | Salient Scaled | 0.9984 | $2.95 \times 10^{-4}$ | 0.061 |
-| **GPTQ ($H^{-1}$ Damped)** | INT4 (g128) | Error Compensation | **0.9986** | **$2.41 \times 10^{-4}$** | **0.052** |
 
 ### 4. Memory Footprint & Ingestion Scaling
 
@@ -313,35 +279,14 @@ Evaluated across 1,000 synthetic calibration activations with heavy-tailed chann
 
 The `.pox` container is structured specifically for zero-copy memory-mapped operations:
 
-```text
-┌────────────────────────────────────────────────────────┐
-│ Header (128 bytes)                                     │
-│  - Magic: "POX\0" (0x50, 0x4F, 0x58, 0x00)             │
-│  - Version: u16 (Major=1, Minor=0)                     │
-│  - Tensor Count: u32                                   │
-│  - Metadata Length: u64                                │
-│  - Checksum: [u8; 32] (SHA-256 of header + metadata)   │
-│  - Alignment: 64 bytes                                 │
-├────────────────────────────────────────────────────────┤
-│ Metadata Section (JSON / FlexBuffers)                  │
-│  - Architecture specification (Llama, Mistral, Qwen)   │
-│  - Quantization config (scales, group size, algorithm) │
-│  - Cryptographic signatures (Ed25519)                  │
-├────────────────────────────────────────────────────────┤
-│ Tensor Index Table                                     │
-│  - Tensor Name, Shape, DataType, Group Size            │
-│  - 64-byte aligned Payload Offset & Byte Length        │
-├────────────────────────────────────────────────────────┤
-│ Payload Section (64-byte aligned SIMD buffers)         │
-│  - Packed INT4 nibble blocks [q0 | q1]                 │
-│  - FP16 scale factors & zero offsets                   │
-│  - Sparse outlier coordinate indices                   │
-└────────────────────────────────────────────────────────┘
-```
+- **128-Byte Fixed Header**: Magic bytes `"POX\0"` (`0x50, 0x4F, 0x58, 0x00`), format version, total tensor count, metadata payload length, SHA-256 header checksum, and strict 64-byte alignment padding.
+- **Metadata Section**: JSON-encoded architecture parameters, quantization plan records, and Ed25519 signature payload.
+- **Tensor Table**: Per-tensor metadata including canonical name, dimension shape, precision data type (`DType::I4`, `DType::I8`, `DType::F16`), group size, and 64-byte aligned payload byte offset.
+- **Payload Section**: SIMD-aligned contiguous memory buffers containing packed 4-bit nibble blocks (`pack_i4`), FP16 group scale and zero-offset arrays, and sparse outlier coordinate tables.
 
 ### Second-Order Hessian Calibration Math
 
-Standard uniform quantization minimizes the parameter error $\arg\min_{\hat{W}} \|W - \hat{W}\|_F^2$. However, neural network layer degradation is governed by output activation drift:
+Standard uniform quantization minimizes parameter difference $\arg\min_{\hat{W}} \|W - \hat{W}\|_F^2$. However, layer degradation is governed by output activation drift:
 
 $$E = \|W X - \hat{W} X\|_2^2 = (W - \hat{W}) X X^T (W - \hat{W})^T$$
 
@@ -350,24 +295,24 @@ ParaOxidizer estimates the empirical Hessian matrix $H$:
 $$H = \frac{2}{N} X X^T + \lambda I, \quad \lambda = 0.01 \cdot \text{mean}(\text{diag}(H))$$
 
 1. **AWQ (Activation-Aware Weight Quantization)**:
-   Channel importance $s_j$ is derived from average activation magnitudes $s_j = \frac{1}{N} \sum_{i} |X_{i, j}|$. Salient channels ($top \ 1\%$) are scaled by $s^{\alpha}$ ($\alpha \approx 0.5$) before uniform quantization, shielding them from precision collapse.
+   Channel importance $s_j$ is derived from average activation magnitudes $s_j = \frac{1}{N} \sum_{i} |X_{i, j}|$. Salient channels ($top \ 1\%$) are scaled by $s^{\alpha}$ ($\alpha \approx 0.5$) prior to quantization, shielding critical attention and MLP projection coordinates from quantization noise.
 2. **GPTQ (Generalized Post-Training Quantization)**:
-   Inverts the damped Hessian $H^{-1}$ using Cholesky or Gauss-Jordan decomposition. Quantizes weights column-by-column ($w_q = \text{round}(w / \Delta) \cdot \Delta$) and immediately compensates all remaining unquantized weights in row $W$ via:
+   Inverts the damped Hessian $H^{-1}$ via Gauss-Jordan decomposition. Quantizes weights column-by-column ($w_q = \text{round}(w / \Delta) \cdot \Delta$) and immediately compensates all remaining unquantized weights in row $W$ via:
 
 $$W_{:, >j} \leftarrow W_{:, >j} - \frac{w_j - \hat{w}_j}{[H^{-1}]_{j, j}} \cdot [H^{-1}]_{j, >j}$$
 
-### Apple Silicon Metal GPU Execution
+### Apple Silicon Metal GPU Compute Pipeline
 
 For unified memory GPUs, ParaOxidizer implements a Metal compute pipeline (`crates/paraoxidizer-runtime/src/metal_backend.rs`):
-- Allocates unified memory buffers using `MTLResourceStorageModeShared`, avoiding discrete PCIe host-to-device memory copies.
+- Allocates unified memory buffers using `MTLResourceStorageModeShared`, avoiding discrete PCIe host-to-device transfers.
 - Unrolls 4-bit nibble decoding directly inside GPU threadgroup memory (`q0 = byte & 0x0F`, `q1 = (byte >> 4) & 0x0F`).
 - Fuses scale adjustment `dequant = min_offset + q * scale` with 32-bit floating-point multiply-accumulate operations in parallel across compute units.
 
 ### Cryptographic Security Model
 
-- **Static Scanner**: Scans model tensors prior to execution for structural anomalies, out-of-range floating point values (e.g. latent NaNs or Infs), and malicious weight trigger patterns.
-- **Merkle Tree Supply-Chain**: Tensor hashes are organized into a binary SHA-256 Merkle tree. Modifying even a single nibble invalidates the root digest.
-- **Ed25519 Signatures**: Model weights can be signed by vendors and cryptographically validated on boot. Unsigned or tampered models are rejected prior to execution.
+- **Static Scanner**: Validates model tensors prior to virtual memory mapping for structural anomalies, out-of-range floating point values (latent NaNs or Infs), and malicious weight trigger patterns.
+- **Merkle Tree Integrity**: Individual tensor SHA-256 hashes are organized into a binary Merkle tree. Modifying even a single nibble invalidates the root digest.
+- **Ed25519 Signatures**: Model weights can be cryptographically signed by vendors and validated on boot. Unsigned or tampered models are rejected prior to execution.
 
 ---
 
