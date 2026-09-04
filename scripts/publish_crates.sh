@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-set -e
 
 CRATES=(
     "paraoxidizer-core"
@@ -14,20 +13,51 @@ CRATES=(
     "paraoxidizer-cli"
 )
 
-echo "Publishing ParaOxidizer crates to crates.io..."
+echo "Publishing ParaOxidizer crates to crates.io with automated retry & rate limit handling..."
 
 for crate in "${CRATES[@]}"; do
-    echo "===================================================="
-    echo "Publishing $crate..."
-    echo "===================================================="
-    cargo publish -p "$crate"
-    echo "Waiting 15 seconds for crates.io index to update..."
-    sleep 15
+    while true; do
+        echo "===================================================="
+        echo "Attempting publication of: $crate..."
+        echo "===================================================="
+        out=$(cargo publish -p "$crate" 2>&1)
+        res=$?
+        echo "$out"
+        if [ $res -eq 0 ]; then
+            echo "Successfully published $crate!"
+            echo "Sleeping 15 seconds for crates.io index update..."
+            sleep 15
+            break
+        fi
+
+        if echo "$out" | grep -q -i "already uploaded"; then
+            echo "$crate is already published on crates.io. Proceeding..."
+            break
+        fi
+
+        if echo "$out" | grep -q -i "429 Too Many Requests"; then
+            echo "Encountered Crates.io new-crate rate limit. Waiting 60 seconds before retrying..."
+            sleep 60
+        else
+            echo "Error publishing $crate. Waiting 10 seconds before retry..."
+            sleep 10
+        fi
+    done
 done
 
-echo "===================================================="
-echo "Publishing root meta-package: paraoxidizer..."
-echo "===================================================="
-cargo publish -p paraoxidizer
+while true; do
+    echo "===================================================="
+    echo "Publishing root package: paraoxidizer..."
+    echo "===================================================="
+    out=$(cargo publish -p paraoxidizer 2>&1)
+    res=$?
+    echo "$out"
+    if [ $res -eq 0 ] || echo "$out" | grep -q -i "already uploaded"; then
+        echo "Successfully published root package paraoxidizer!"
+        break
+    fi
+    echo "Retrying root package in 30 seconds..."
+    sleep 30
+done
 
-echo "All crates published successfully!"
+echo "ALL CRATES PUBLISHED SUCCESSFULLY TO CRATES.IO!"
