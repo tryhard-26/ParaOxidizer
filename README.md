@@ -244,31 +244,54 @@ assert is_valid, "Tampering detected in model weights!"
 
 Measurements conducted on **Apple Silicon M4** (10-core CPU, 10-core GPU, ARM NEON, unified memory, Darwin arm64) using `cargo test --test test_real_hf_weights`, `cargo test --test test_model_degradation`, and `cargo run --release -p paraoxidizer-bench --bin pox-bench`:
 
-### 1. Production Model & Checkpoint Evaluation
+### 1. Per-Layer Weight Fidelity on Production Checkpoints (Sampled Layer Evaluation)
 
-Empirically validated directly on official Hugging Face Hub production checkpoints across architectures, parameter counts, and weight tensors on **Apple Silicon M4**:
+Empirically validated directly on official Hugging Face Hub production checkpoints across architectures, parameter counts, and real trained weights on **Apple Silicon M4**:
 
-| Model Checkpoint | Architecture | Parameters | FP16 Size | INT4 `.pox` | Compression | INT8 CosSim | INT4 CosSim | AWQ CosSim | GPTQ CosSim | INT4 SQNR |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **TinyLlama-1.1B** (`TinyLlama/TinyLlama-1.1B-Chat-v1.0`) | Llama | 1.10 B | 2.20 GB | **0.58 GB** | **3.76x** | **0.999802** | **0.994751** | **0.994507** | **0.994374** | **19.75 dB** |
-| **Qwen2.5-1.5B** (`Qwen/Qwen2.5-1.5B`) | Qwen2 | 1.54 B | 3.08 GB | **0.82 GB** | **3.76x** | **0.999862** | **0.994745** | **0.994431** | **0.994385** | **19.75 dB** |
-| **Llama-3.2-1B** (`meta-llama/Llama-3.2-1B`) | Llama | 1.23 B | 2.47 GB | **0.66 GB** | **3.76x** | **0.999399** | **0.994086** | **0.993093** | **0.993598** | **19.23 dB** |
-| **Llama-3.2-3B** (`meta-llama/Llama-3.2-3B`) | Llama | 3.21 B | 6.43 GB | **1.71 GB** | **3.76x** | **0.999898** | **0.994847** | **0.994540** | **0.994495** | **19.83 dB** |
-| **Gemma-2-2B** (`google/gemma-2-2b`) | Gemma2 | 2.61 B | 5.22 GB | **1.39 GB** | **3.76x** | **0.999535** | **0.994895** | **0.994734** | **0.994602** | **19.87 dB** |
-| **Phi-3.5-Mini** (`microsoft/Phi-3.5-mini-instruct`) | Phi3 | 3.82 B | 7.64 GB | **2.03 GB** | **3.76x** | **0.999873** | **0.994996** | **0.994964** | **0.994643** | **19.96 dB** |
-| **Mistral-7B-v0.1** (`mistralai/Mistral-7B-v0.1`) | Mistral | 7.24 B | 14.48 GB | **3.85 GB** | **3.76x** | **0.999885** | **0.994845** | **0.994697** | **0.994713** | **19.83 dB** |
-| **Qwen2.5-7B** (`Qwen/Qwen2.5-7B`) | Qwen2 | 7.61 B | 15.23 GB | **4.05 GB** | **3.76x** | **0.999731** | **0.993861** | **0.992604** | **0.993454** | **19.07 dB** |
+> [!NOTE]
+> **Methodology & Local Hardware Scope**:
+> To benchmark real trained weights on systems with 16 GB host RAM without risking kernel Out-Of-Memory (`SIGKILL`) termination from 30+ GB float allocations, evaluation across the 8 production checkpoints below is performed on **representative attention projection layers (`q_proj`/`k_proj`)** streamed via zero-copy HTTP Range requests directly from official Hugging Face Hub repositories.
+> - **Full Params**, **Full FP16**, and **Full INT4** state the official full-model parameters and projected container footprints.
+> - **Fidelity Columns (CosSim, SQNR)** measure actual reconstruction error on genuine trained BF16/FP16 weights for the sampled projection layer.
 
-- **Production Weight Preservation**: Across all 8 production architectures from 1B to 7B parameters, INT8 symmetric quantization reliably preserves **0.9994+ to 0.9998+** cosine similarity, while INT4 group-128 quantization preserves **0.9938 to 0.9950** cosine similarity with **19.07 to 19.96 dB SQNR**.
-- **Quantization Footprint**: INT4 group-128 achieves a uniform **3.76x physical compression ratio**, reducing a 7B model from 15.23 GB down to 4.05 GB and a 1.1B model from 2.20 GB down to 0.58 GB.
-- **Zero Disk Sprawl Pipeline**: Evaluation executes sequentially via zero-copy HTTP Range chunk streaming and instant cache reclamation, leaving zero disk footprint upon test completion.
+| Model Checkpoint | Architecture | Full Params | Full FP16 | Full INT4 | Compression | Sampled Layer Evaluated | INT8 CosSim | INT4 CosSim | AWQ CosSim | GPTQ CosSim | INT4 SQNR |
+| :--- | :---: | :---: | :---: | :---: | :---: | :--- | :---: | :---: | :---: | :---: | :---: |
+| **TinyLlama-1.1B** (`TinyLlama/TinyLlama-1.1B-Chat-v1.0`) | Llama | 1.10 B | 2.20 GB | **0.58 GB** | **3.76x** | `layers.0.self_attn.q_proj` | **0.999802** | **0.994751** | **0.994507** | **0.994374** | **19.75 dB** |
+| **Qwen2.5-1.5B** (`Qwen/Qwen2.5-1.5B`) | Qwen2 | 1.54 B | 3.08 GB | **0.82 GB** | **3.76x** | `layers.0.self_attn.q_proj` | **0.999862** | **0.994745** | **0.994431** | **0.994385** | **19.75 dB** |
+| **Llama-3.2-1B** (`meta-llama/Llama-3.2-1B`) | Llama | 1.23 B | 2.47 GB | **0.66 GB** | **3.76x** | `layers.0.self_attn.q_proj` | **0.999399** | **0.994086** | **0.993093** | **0.993598** | **19.23 dB** |
+| **Llama-3.2-3B** (`meta-llama/Llama-3.2-3B`) | Llama | 3.21 B | 6.43 GB | **1.71 GB** | **3.76x** | `layers.0.self_attn.q_proj` | **0.999898** | **0.994847** | **0.994540** | **0.994495** | **19.83 dB** |
+| **Gemma-2-2B** (`google/gemma-2-2b`) | Gemma2 | 2.61 B | 5.22 GB | **1.39 GB** | **3.76x** | `layers.0.self_attn.q_proj` | **0.999535** | **0.994895** | **0.994734** | **0.994602** | **19.87 dB** |
+| **Phi-3.5-Mini** (`microsoft/Phi-3.5-mini-instruct`) | Phi3 | 3.82 B | 7.64 GB | **2.03 GB** | **3.76x** | `layers.0.self_attn.q_proj` | **0.999873** | **0.994996** | **0.994964** | **0.994643** | **19.96 dB** |
+| **Mistral-7B-v0.1** (`mistralai/Mistral-7B-v0.1`) | Mistral | 7.24 B | 14.48 GB | **3.85 GB** | **3.76x** | `layers.19.self_attn.q_proj` | **0.999885** | **0.994845** | **0.994697** | **0.994713** | **19.83 dB** |
+| **Qwen2.5-7B** (`Qwen/Qwen2.5-7B`) | Qwen2 | 7.61 B | 15.23 GB | **4.05 GB** | **3.76x** | `layers.11.self_attn.k_proj` | **0.999731** | **0.993861** | **0.992604** | **0.993454** | **19.07 dB** |
 
-### 2. Model Degradation & Quantization Fidelity
+- **Production Weight Preservation**: Across all 8 production architectures, INT8 symmetric quantization on real trained weights preserves **0.9994+ to 0.9998+** cosine similarity, while INT4 group-128 preserves **0.9938 to 0.9950** cosine similarity with **19.07 to 19.96 dB SQNR**.
+- **Container Footprint Scaling**: INT4 group-128 achieves a **3.76x physical compression ratio**, bringing a 7B model from 15.23 GB down to 4.05 GB and a 1.1B model from 2.20 GB down to 0.58 GB.
+- **Zero-Copy Remote Range Pipeline**: Streamed layer-by-layer over HTTP Range directly from Hugging Face CDN without writing multi-gigabyte checkpoints to local disk.
+
+### 2. Full-Model End-to-End Validation: TinyLlama-1.1B (All Tensors & Layers)
+
+To provide an empirical, end-to-end full-model baseline, every single tensor across all 22 layers of `TinyLlama/TinyLlama-1.1B-Chat-v1.0` (201 tensors, 1.100B parameters) was quantized and assembled into a physical `.pox` container on disk, then verified bit-for-bit:
+
+| Model Component / Layer Type | Tensor Count | Parameters | Precision | Cosine Similarity | MSE | SQNR (dB) |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Attention Projections (`q`, `k`, `v`, `o`)** | 88 | 207.62 M | INT4 (Group-128) | **0.994406** | $6.0068 \times 10^{-6}$ | 19.47 dB |
+| **Feed-Forward MLP (`gate`, `up`, `down`)** | 66 | 761.27 M | INT4 (Group-128) | **0.994866** | $3.5940 \times 10^{-6}$ | 19.85 dB |
+| **Token Embeddings (`embed_tokens`)** | 1 | 65.54 M | INT4 (Group-128) | **0.994992** | $2.2450 \times 10^{-6}$ | 19.96 dB |
+| **Output LM Head (`lm_head`)** | 1 | 65.54 M | INT4 (Group-128) | **0.994118** | $7.2610 \times 10^{-6}$ | 19.25 dB |
+| **Normalization Weights (`rms_norm`)** | 45 | 92.16 k | INT8 Symmetric | **0.999990** | $3.9051 \times 10^{-6}$ | 46.98 dB |
+| **TOTAL / WHOLE MODEL AGGREGATE** | **201** | **1.100 B** | **Mixed INT4/INT8** | **0.994893** | **$4.1875 \times 10^{-6}$** | **19.87 dB** |
+
+- **Physical Container Footprint**: Original SafeTensors BF16 file: **2,098.20 MB (2.200 GB)** $\to$ Compiled `.pox` container: **557.45 MB (0.585 GB)** (**3.76x true compression ratio**).
+- **Ingestion & Compilation Speed**: All 201 tensors quantized in **9.57 seconds** on Apple Silicon M4 (10-core ARM NEON). Container serialized and aligned to disk in **1.67 seconds**.
+- **Supply-Chain Integrity**: Cold-start zero-copy memory mapping (`mmap`) achieved in **790 µs**; complete cryptographic SHA-256 verification confirmed **100% of 201 tensors bit-intact** in **1.71 seconds**.
+
+### 3. Model Degradation & Quantization Fidelity
 
 Evaluated on transformer projection weights ($512 \times 256$) with empirical calibration activations and natural heavy-tailed outlier channels ($\ge 3.5\sigma$):
 
 | Method | Weight Cosine Sim | Weight MSE | Weight SQNR | Activation MSE | Activation Cosine Sim |
-| :--- | :--- | :--- | :--- | :--- | :--- |
+| :--- | :---: | :---: | :---: | :---: | :---: |
 | **INT8 Symmetric** | **0.999271** | $1.888 \times 10^{-6}$ | **28.36 dB** | $8.212 \times 10^{-5}$ | 0.976195 |
 | **INT4 Group-128 (Min-Max)** | 0.996662 | $8.681 \times 10^{-6}$ | 21.73 dB | $3.582 \times 10^{-4}$ | 0.907379 |
 | **INT4 Group-128 + Outliers** | **0.997191** | $7.302 \times 10^{-6}$ | **22.48 dB** | $3.118 \times 10^{-4}$ | 0.923093 |
@@ -278,7 +301,7 @@ Evaluated on transformer projection weights ($512 \times 256$) with empirical ca
 - **Weight vs Activation Space Optimization**: Naive Min-Max rounding directly minimizes $\| W - \hat{W} \|_F^2$ on weight values without input awareness. AWQ prioritizes salient activation channels, reducing activation MSE from $3.582 \times 10^{-4}$ to $3.222 \times 10^{-4}$.
 - **Second-Order Error Compensation**: GPTQ utilizes the empirical damped inverse Hessian $H^{-1}$ via column-by-column error compensation to future unquantized channels, reducing output activation error by **3.03x** ($3.582 \times 10^{-4} \to 1.180 \times 10^{-4}$) and lifting output activation cosine similarity to **0.9668**.
 
-### 3. Vector Dot-Product Microbenchmarks (ARM NEON vs Scalar)
+### 4. Vector Dot-Product Microbenchmarks (ARM NEON vs Scalar)
 
 Evaluates inner product kernels during projection passes:
 
@@ -290,7 +313,7 @@ Evaluates inner product kernels during projection passes:
 | **$N = 4096$** | 0.697 µs (5.88 GB/s) | 2.433 µs (1.68 GB/s) | **3.49x** |
 | **$N = 8192$** | 1.488 µs (5.51 GB/s) | 5.250 µs (1.56 GB/s) | **3.53x** |
 
-### 4. INT4 GEMV Throughput (Apple M4 Unified Memory)
+### 5. INT4 GEMV Throughput (Apple M4 Unified Memory)
 
 Matrix-vector multiplication ($M=1, K=4096, N=4096$) comparing FP16 baseline against ParaOxidizer INT4 group quantization:
 
@@ -301,7 +324,7 @@ Matrix-vector multiplication ($M=1, K=4096, N=4096$) comparing FP16 baseline aga
 | **INT4 Group-128 (Metal GPU)** | 41.15 µs | 815.31 GB/s (eff) | 9.44 MB | **5.52x** |
 | **INT4 Group-64 (Metal GPU)** | 44.20 µs | 759.05 GB/s (eff) | 10.49 MB | **5.14x** |
 
-### 5. Memory Footprint & Ingestion Scaling
+### 6. Memory Footprint & Ingestion Scaling
 
 | Model Architecture | Parameter Count | SafeTensors (FP16) | `.pox` INT4 (g128) | Compression Ratio | Cold-Start mmap |
 | :--- | :--- | :--- | :--- | :--- | :--- |
