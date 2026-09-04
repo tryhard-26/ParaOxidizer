@@ -329,24 +329,6 @@ For unified memory GPUs, ParaOxidizer implements a Metal compute pipeline (`crat
 
 ---
 
-## Workspace Structure
-
-| Crate | Path | Description |
-| :--- | :--- | :--- |
-| `paraoxidizer-core` | `crates/paraoxidizer-core` | Architecture abstractions, tensor representations, hardware probing |
-| `paraoxidizer-format` | `crates/paraoxidizer-format` | `.pox` zero-copy binary format, SafeTensors/GGUF/HF ingestion |
-| `paraoxidizer-quant` | `crates/paraoxidizer-quant` | Affine INT4 & symmetric INT8 kernels, AWQ/GPTQ dispatch, SIMD dot |
-| `paraoxidizer-calibration` | `crates/paraoxidizer-calibration` | Empirical Hessian computation, task profiles, sensitivity analysis |
-| `paraoxidizer-optimizer` | `crates/paraoxidizer-optimizer` | Multi-objective Pareto frontier mixed-precision solver |
-| `paraoxidizer-security` | `crates/paraoxidizer-security` | SHA-256 Merkle trees, Ed25519 signing/verification, backdoor scan |
-| `paraoxidizer-runtime` | `crates/paraoxidizer-runtime` | Transformer decoder, KV cache, tokenizer, Metal GPU & NEON engines |
-| `paraoxidizer-serve` | `crates/paraoxidizer-serve` | Axum HTTP server (`/v1/chat/completions` with SSE, `/metrics`) |
-| `paraoxidizer-bench` | `crates/paraoxidizer-bench` | Hardware benchmarks (SIMD, GEMV, fidelity, system, throughput) |
-| `paraoxidizer-cli` | `crates/paraoxidizer-cli` | Unified CLI binary (`pox` / `paraoxidizer`) |
-| `paraoxidizer-py` | `crates/paraoxidizer-py` | Python native C-extension module (`import pox`) |
-
----
-
 ## Author
 
 **Adriteyo Das**
