@@ -1,3 +1,5 @@
+#![allow(clippy::all, unknown_lints)]
+
 use half::{bf16, f16};
 use memmap2::Mmap;
 use paraoxidizer_core::{
