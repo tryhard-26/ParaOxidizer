@@ -96,6 +96,17 @@ pub mod macos_metal {
                 return Ok(());
             }
 
+            let num_groups_per_row = (cols + group_size - 1) / group_size;
+            let req_scale_bytes = rows * num_groups_per_row * 4;
+            let row_packed_bytes = (cols + 1) / 2;
+            let req_weight_bytes = rows * row_packed_bytes;
+
+            if scale_data.len() < req_scale_bytes || packed_weights.len() < req_weight_bytes {
+                return Err(paraoxidizer_core::error::PoxError::Quantization(
+                    "Buffer layout incompatible with 2D Metal GEMV".into(),
+                ));
+            }
+
             // Apple Silicon unified memory buffers (MTLResourceStorageModeShared)
             let buf_weights = self.device.new_buffer_with_data(
                 packed_weights.as_ptr() as *const _,

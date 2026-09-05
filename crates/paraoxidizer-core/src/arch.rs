@@ -133,7 +133,7 @@ impl Default for ModelConfig {
 
 impl ModelConfig {
     pub fn head_dim(&self) -> usize {
-        self.hidden_size / self.num_attention_heads
+        (self.hidden_size / self.num_attention_heads.max(1)).max(1)
     }
 
     pub fn total_parameters_approx(&self) -> u64 {

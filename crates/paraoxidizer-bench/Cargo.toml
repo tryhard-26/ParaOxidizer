@@ -41,4 +41,8 @@ path = "src/bin/bench_production_models.rs"
 name = "bench-full-model"
 path = "src/bin/bench_full_model.rs"
 
+[[bin]]
+name = "bench-model-performance"
+path = "src/bin/bench_model_performance.rs"
+
 
