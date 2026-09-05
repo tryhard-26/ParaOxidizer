@@ -187,8 +187,8 @@ memory_limit = "8GB"
 quality_floor = 97.0
 target_hardware = "auto"
 "#,
-        model_dir.display(),
-        out_pox.display()
+        model_dir.display().to_string().replace('\\', "/"),
+        out_pox.display().to_string().replace('\\', "/")
     );
 
     std::fs::write(&toml_path, toml_content).unwrap();
