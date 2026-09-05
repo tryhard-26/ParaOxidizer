@@ -40,7 +40,9 @@ impl KvCache {
             return;
         }
         let offset = ((layer * self.max_seq_len + pos) * self.num_kv_heads) * self.head_dim;
-        let len = (self.num_kv_heads * self.head_dim).min(k.len()).min(v.len());
+        let len = (self.num_kv_heads * self.head_dim)
+            .min(k.len())
+            .min(v.len());
         if offset + len <= self.k_cache.len() {
             self.k_cache[offset..offset + len].copy_from_slice(&k[..len]);
             self.v_cache[offset..offset + len].copy_from_slice(&v[..len]);
@@ -52,7 +54,8 @@ impl KvCache {
             return &[];
         }
         let safe_head = kv_head % self.num_kv_heads;
-        let offset = ((layer * self.max_seq_len + pos) * self.num_kv_heads + safe_head) * self.head_dim;
+        let offset =
+            ((layer * self.max_seq_len + pos) * self.num_kv_heads + safe_head) * self.head_dim;
         if offset + self.head_dim <= self.k_cache.len() {
             &self.k_cache[offset..offset + self.head_dim]
         } else {
@@ -65,7 +68,8 @@ impl KvCache {
             return &[];
         }
         let safe_head = kv_head % self.num_kv_heads;
-        let offset = ((layer * self.max_seq_len + pos) * self.num_kv_heads + safe_head) * self.head_dim;
+        let offset =
+            ((layer * self.max_seq_len + pos) * self.num_kv_heads + safe_head) * self.head_dim;
         if offset + self.head_dim <= self.v_cache.len() {
             &self.v_cache[offset..offset + self.head_dim]
         } else {
@@ -170,7 +174,15 @@ impl PoxEngine {
                 if outliers.is_none() {
                     if let Some(ref metal) = self.metal_backend {
                         if metal
-                            .gemv_int4(weight_data, scale_data, run_rows, run_cols, group_size, x, y)
+                            .gemv_int4(
+                                weight_data,
+                                scale_data,
+                                run_rows,
+                                run_cols,
+                                group_size,
+                                x,
+                                y,
+                            )
                             .is_ok()
                         {
                             ran_projection = true;
@@ -325,7 +337,8 @@ impl PoxEngine {
                         }
                         DType::F32 => {
                             for (i, chunk) in data.chunks_exact(4).enumerate().take(x.len()) {
-                                let w = f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+                                let w =
+                                    f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
                                 x[i] *= w;
                             }
                         }
@@ -452,7 +465,11 @@ impl PoxEngine {
                             .unwrap_or(1.0);
                         let start = tok_idx * hidden_size;
                         if start + hidden_size <= embed_data.len() {
-                            for (i, &b) in embed_data[start..start + hidden_size].iter().enumerate().take(hidden_size) {
+                            for (i, &b) in embed_data[start..start + hidden_size]
+                                .iter()
+                                .enumerate()
+                                .take(hidden_size)
+                            {
                                 x[i] = (b as i8 as f32) * scale;
                             }
                         }
@@ -632,7 +649,8 @@ impl PoxEngine {
             }
 
             // C. Post-Attention RMSNorm
-            let post_norm_name = format!("model.layers.{layer_idx}.post_attention_layernorm.weight");
+            let post_norm_name =
+                format!("model.layers.{layer_idx}.post_attention_layernorm.weight");
             let mut norm2_x = x.clone();
             self.rms_norm_with_weight(&mut norm2_x, Some(&post_norm_name), eps);
 
@@ -640,7 +658,9 @@ impl PoxEngine {
             let gate_name = format!("model.layers.{layer_idx}.mlp.gate_proj.weight");
             let up_name = format!("model.layers.{layer_idx}.mlp.up_proj.weight");
 
-            if self.file.tensor_map.contains_key(&gate_name) && self.file.tensor_map.contains_key(&up_name) {
+            if self.file.tensor_map.contains_key(&gate_name)
+                && self.file.tensor_map.contains_key(&up_name)
+            {
                 let inter_dim = self.config.intermediate_size;
                 let mut gate = vec![0.0f32; inter_dim];
                 let mut up = vec![0.0f32; inter_dim];
@@ -677,7 +697,8 @@ impl PoxEngine {
 
         // 4. LM Head projection to logits
         let mut logits = vec![0.0f32; vocab_size];
-        let has_head = self.project_tensor("lm_head.weight", &x, &mut logits, vocab_size, hidden_size);
+        let has_head =
+            self.project_tensor("lm_head.weight", &x, &mut logits, vocab_size, hidden_size);
         if !has_head {
             for (i, l) in logits.iter_mut().enumerate() {
                 let v = x[i % hidden_size];
@@ -707,7 +728,6 @@ impl PoxEngine {
         }
         Ok(all_logits)
     }
-
 
     /// Streaming generation loop: yields tokens through a callback function
     pub fn generate_stream<F>(

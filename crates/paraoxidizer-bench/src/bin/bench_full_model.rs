@@ -7,17 +7,10 @@ use paraoxidizer_format::{
     pox::{PoxFile, PoxMetadata, PoxQuantPlanRecord, PoxWriter},
 };
 use paraoxidizer_quant::kernels::{
-    dequantize_int4_group, dequantize_int8_symmetric, quantize_int4_group,
-    quantize_int8_symmetric,
+    dequantize_int4_group, dequantize_int8_symmetric, quantize_int4_group, quantize_int8_symmetric,
 };
 use safetensors::tensor::{Dtype as StDtype, SafeTensors};
-use std::{
-    collections::HashMap,
-    fs::File,
-    io::Read,
-    path::Path,
-    time::Instant,
-};
+use std::{collections::HashMap, fs::File, io::Read, path::Path, time::Instant};
 
 #[derive(Default)]
 struct CategoryStats {
@@ -76,7 +69,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output_pox_path = model_dir.join("tinyllama-1.1b-int4.pox");
 
     if !safetensors_path.exists() {
-        eprintln!("Error: safetensors file not found at {}", safetensors_path.display());
+        eprintln!(
+            "Error: safetensors file not found at {}",
+            safetensors_path.display()
+        );
         std::process::exit(1);
     }
 
@@ -94,13 +90,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Architecture:           {}", model_config.architecture);
     println!("Hidden Layers:          {}", model_config.num_hidden_layers);
     println!("Hidden Size:            {}", model_config.hidden_size);
-    println!("Attention Heads:        {} (KV heads: {})", model_config.num_attention_heads, model_config.num_key_value_heads);
+    println!(
+        "Attention Heads:        {} (KV heads: {})",
+        model_config.num_attention_heads, model_config.num_key_value_heads
+    );
     println!("Vocab Size:             {}", model_config.vocab_size);
 
     // 2. Memory-map SafeTensors file
     let st_file = File::open(&safetensors_path)?;
     let st_file_size = st_file.metadata()?.len();
-    println!("Source SafeTensors Size: {:.2} MB ({:.3} GB)", st_file_size as f64 / (1024.0 * 1024.0), st_file_size as f64 / 1e9);
+    println!(
+        "Source SafeTensors Size: {:.2} MB ({:.3} GB)",
+        st_file_size as f64 / (1024.0 * 1024.0),
+        st_file_size as f64 / 1e9
+    );
 
     let mmap = unsafe { Mmap::map(&st_file)? };
     let st = SafeTensors::deserialize(&mmap)?;
@@ -113,7 +116,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         model_config: model_config.clone(),
         total_parameters: 1_100_048_384,
         quantized_by: format!("ParaOxidizer v{}", env!("CARGO_PKG_VERSION")),
-        timestamp_utc: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs(),
+        timestamp_utc: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_secs(),
         original_format: "SafeTensors (BF16)".into(),
         base_model_name: "TinyLlama-1.1B-Chat-v1.0".into(),
     };
@@ -143,9 +148,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let raw_data = view.data();
 
         let floats: Vec<f32> = match view.dtype() {
-            StDtype::BF16 => raw_data.chunks_exact(2).map(|c| bf16::from_le_bytes([c[0], c[1]]).to_f32()).collect(),
-            StDtype::F16 => raw_data.chunks_exact(2).map(|c| f16::from_le_bytes([c[0], c[1]]).to_f32()).collect(),
-            StDtype::F32 => raw_data.chunks_exact(4).map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]])).collect(),
+            StDtype::BF16 => raw_data
+                .chunks_exact(2)
+                .map(|c| bf16::from_le_bytes([c[0], c[1]]).to_f32())
+                .collect(),
+            StDtype::F16 => raw_data
+                .chunks_exact(2)
+                .map(|c| f16::from_le_bytes([c[0], c[1]]).to_f32())
+                .collect(),
+            StDtype::F32 => raw_data
+                .chunks_exact(4)
+                .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+                .collect(),
             other => panic!("Unexpected dtype in safetensors: {:?}", other),
         };
 
@@ -205,10 +219,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let quant_duration = quant_start.elapsed();
-    println!("All {} tensors quantized in {:.2}s", total_tensors, quant_duration.as_secs_f64());
+    println!(
+        "All {} tensors quantized in {:.2}s",
+        total_tensors,
+        quant_duration.as_secs_f64()
+    );
 
     // 4. Write full .pox container to disk
-    println!("Writing compiled .pox container to {}...", output_pox_path.display());
+    println!(
+        "Writing compiled .pox container to {}...",
+        output_pox_path.display()
+    );
     let write_start = Instant::now();
     writer.write_to_file(&output_pox_path)?;
     let write_duration = write_start.elapsed();
@@ -216,7 +237,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pox_file_size = std::fs::metadata(&output_pox_path)?.len();
     let compression_ratio = st_file_size as f64 / pox_file_size as f64;
 
-    println!("Wrote {:.2} MB in {:.2}s (Compression: {:.2}x)\n",
+    println!(
+        "Wrote {:.2} MB in {:.2}s (Compression: {:.2}x)\n",
         pox_file_size as f64 / (1024.0 * 1024.0),
         write_duration.as_secs_f64(),
         compression_ratio
@@ -232,8 +254,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let verify_duration = verify_start.elapsed();
 
     println!("Container Verification:");
-    println!("  Cold-Start mmap Time: {:.2} µs", mmap_duration.as_micros());
-    println!("  Full SHA-256 Checksum: Verified in {:.2} ms (All {} tensors bit-intact)\n", verify_duration.as_secs_f64() * 1000.0, pox.tensors.len());
+    println!(
+        "  Cold-Start mmap Time: {:.2} µs",
+        mmap_duration.as_micros()
+    );
+    println!(
+        "  Full SHA-256 Checksum: Verified in {:.2} ms (All {} tensors bit-intact)\n",
+        verify_duration.as_secs_f64() * 1000.0,
+        pox.tensors.len()
+    );
 
     // 6. Print Full Model Benchmark Table
     let mut table = Table::new();
@@ -311,10 +340,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", table);
 
     println!("\nPhysical Disk Footprint:");
-    println!("  Raw SafeTensors (BF16):  {:.2} MB ({:.3} GB)", st_file_size as f64 / (1024.0 * 1024.0), st_file_size as f64 / 1e9);
-    println!("  Compiled .pox (INT4/8):  {:.2} MB ({:.3} GB)", pox_file_size as f64 / (1024.0 * 1024.0), pox_file_size as f64 / 1e9);
+    println!(
+        "  Raw SafeTensors (BF16):  {:.2} MB ({:.3} GB)",
+        st_file_size as f64 / (1024.0 * 1024.0),
+        st_file_size as f64 / 1e9
+    );
+    println!(
+        "  Compiled .pox (INT4/8):  {:.2} MB ({:.3} GB)",
+        pox_file_size as f64 / (1024.0 * 1024.0),
+        pox_file_size as f64 / 1e9
+    );
     println!("  True Compression Ratio:  {:.2}x", compression_ratio);
-    println!("  Total Parameters:        {} (100% verified)", stats_global.total_params);
+    println!(
+        "  Total Parameters:        {} (100% verified)",
+        stats_global.total_params
+    );
 
     Ok(())
 }

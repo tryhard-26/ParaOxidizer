@@ -1,5 +1,12 @@
 //! Lightweight quantized Transformer inference engine, KV cache, tokenizer, and sampler.
 
+#![allow(
+    clippy::too_many_arguments,
+    clippy::manual_div_ceil,
+    clippy::needless_range_loop,
+    clippy::collapsible_if
+)]
+
 pub mod engine;
 pub mod eval;
 pub mod metal_backend;

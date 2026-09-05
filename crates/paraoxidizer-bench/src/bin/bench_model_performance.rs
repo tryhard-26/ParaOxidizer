@@ -7,8 +7,7 @@ use paraoxidizer_core::{
 };
 use paraoxidizer_format::pox::{PoxFile, PoxMetadata, PoxQuantPlanRecord, PoxWriter};
 use paraoxidizer_quant::kernels::{
-    compute_awq_scales, quantize_awq, quantize_gptq, quantize_int4_group,
-    quantize_int8_symmetric,
+    compute_awq_scales, quantize_awq, quantize_gptq, quantize_int4_group, quantize_int8_symmetric,
 };
 use paraoxidizer_runtime::{
     compute_kl_divergence, compute_nll, compute_perplexity, compute_top1_agreement,
@@ -126,8 +125,16 @@ fn build_model_pox<P: AsRef<Path>>(
                 None,
             );
         } else if method == "INT4-AWQ" {
-            let cols = if shape.rank() >= 2 { shape.dims()[1] } else { floats.len() };
-            let rows = if shape.rank() >= 2 { shape.dims()[0] } else { 1 };
+            let cols = if shape.rank() >= 2 {
+                shape.dims()[1]
+            } else {
+                floats.len()
+            };
+            let rows = if shape.rank() >= 2 {
+                shape.dims()[0]
+            } else {
+                1
+            };
             let mut act_scales = vec![0.0f32; cols];
             for c in 0..cols {
                 let mut sum_mag = 0.0f32;
@@ -148,8 +155,16 @@ fn build_model_pox<P: AsRef<Path>>(
                 None,
             );
         } else if method == "INT4-GPTQ" {
-            let cols = if shape.rank() >= 2 { shape.dims()[1] } else { floats.len() };
-            let rows = if shape.rank() >= 2 { shape.dims()[0] } else { 1 };
+            let cols = if shape.rank() >= 2 {
+                shape.dims()[1]
+            } else {
+                floats.len()
+            };
+            let rows = if shape.rank() >= 2 {
+                shape.dims()[0]
+            } else {
+                1
+            };
             let sub_cols = cols.min(64);
             let mut hess = HessianMatrix::new(sub_cols);
             let mut acts = vec![0.0f32; sub_cols * 16];
@@ -189,8 +204,12 @@ fn build_model_pox<P: AsRef<Path>>(
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=======================================================================================================");
-    println!("  ParaOxidizer Generative Model Performance & Perplexity Benchmark (Apple Silicon M4)");
-    println!("  Full Llama Transformer Computational Graph: RoPE, GQA Attention, SwiGLU, and KV-Cache");
+    println!(
+        "  ParaOxidizer Generative Model Performance & Perplexity Benchmark (Apple Silicon M4)"
+    );
+    println!(
+        "  Full Llama Transformer Computational Graph: RoPE, GQA Attention, SwiGLU, and KV-Cache"
+    );
     println!("=======================================================================================================\n");
 
     let hidden_size = 512;
@@ -221,18 +240,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  Hidden Size:          {}", hidden_size);
     println!("  Intermediate Size:    {}", intermediate_size);
     println!("  Transformer Layers:   {}", num_hidden_layers);
-    println!("  Attention Heads:      {} (KV Heads: {}, Head Dim: {})", num_attention_heads, num_key_value_heads, head_dim);
+    println!(
+        "  Attention Heads:      {} (KV Heads: {}, Head Dim: {})",
+        num_attention_heads, num_key_value_heads, head_dim
+    );
     println!("  Vocabulary Size:      {}", vocab_size);
     println!("  Context / RoPE Theta: {}\n", config.rope_theta);
 
     // 1. Synthesize trained-style weights
-    println!("Generating Transformer parameters with natural heavy-tailed outlier channels (3.8σ)...");
+    println!(
+        "Generating Transformer parameters with natural heavy-tailed outlier channels (3.8σ)..."
+    );
     let mut weights_map = HashMap::new();
 
     // Embeddings
     weights_map.insert(
         "model.embed_tokens.weight".to_string(),
-        (Shape::new(vec![vocab_size, hidden_size]), generate_synthetic_weights(vocab_size * hidden_size, 0.04)),
+        (
+            Shape::new(vec![vocab_size, hidden_size]),
+            generate_synthetic_weights(vocab_size * hidden_size, 0.04),
+        ),
     );
 
     // Layers
@@ -246,19 +273,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
         weights_map.insert(
             format!("model.layers.{l}.self_attn.q_proj.weight"),
-            (Shape::new(vec![q_dim, hidden_size]), generate_synthetic_weights(q_dim * hidden_size, 0.03)),
+            (
+                Shape::new(vec![q_dim, hidden_size]),
+                generate_synthetic_weights(q_dim * hidden_size, 0.03),
+            ),
         );
         weights_map.insert(
             format!("model.layers.{l}.self_attn.k_proj.weight"),
-            (Shape::new(vec![kv_dim, hidden_size]), generate_synthetic_weights(kv_dim * hidden_size, 0.03)),
+            (
+                Shape::new(vec![kv_dim, hidden_size]),
+                generate_synthetic_weights(kv_dim * hidden_size, 0.03),
+            ),
         );
         weights_map.insert(
             format!("model.layers.{l}.self_attn.v_proj.weight"),
-            (Shape::new(vec![kv_dim, hidden_size]), generate_synthetic_weights(kv_dim * hidden_size, 0.03)),
+            (
+                Shape::new(vec![kv_dim, hidden_size]),
+                generate_synthetic_weights(kv_dim * hidden_size, 0.03),
+            ),
         );
         weights_map.insert(
             format!("model.layers.{l}.self_attn.o_proj.weight"),
-            (Shape::new(vec![hidden_size, q_dim]), generate_synthetic_weights(hidden_size * q_dim, 0.03)),
+            (
+                Shape::new(vec![hidden_size, q_dim]),
+                generate_synthetic_weights(hidden_size * q_dim, 0.03),
+            ),
         );
         weights_map.insert(
             format!("model.layers.{l}.post_attention_layernorm.weight"),
@@ -266,15 +305,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
         weights_map.insert(
             format!("model.layers.{l}.mlp.gate_proj.weight"),
-            (Shape::new(vec![intermediate_size, hidden_size]), generate_synthetic_weights(intermediate_size * hidden_size, 0.03)),
+            (
+                Shape::new(vec![intermediate_size, hidden_size]),
+                generate_synthetic_weights(intermediate_size * hidden_size, 0.03),
+            ),
         );
         weights_map.insert(
             format!("model.layers.{l}.mlp.up_proj.weight"),
-            (Shape::new(vec![intermediate_size, hidden_size]), generate_synthetic_weights(intermediate_size * hidden_size, 0.03)),
+            (
+                Shape::new(vec![intermediate_size, hidden_size]),
+                generate_synthetic_weights(intermediate_size * hidden_size, 0.03),
+            ),
         );
         weights_map.insert(
             format!("model.layers.{l}.mlp.down_proj.weight"),
-            (Shape::new(vec![hidden_size, intermediate_size]), generate_synthetic_weights(hidden_size * intermediate_size, 0.03)),
+            (
+                Shape::new(vec![hidden_size, intermediate_size]),
+                generate_synthetic_weights(hidden_size * intermediate_size, 0.03),
+            ),
         );
     }
 
@@ -285,7 +333,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     weights_map.insert(
         "lm_head.weight".to_string(),
-        (Shape::new(vec![vocab_size, hidden_size]), generate_synthetic_weights(vocab_size * hidden_size, 0.03)),
+        (
+            Shape::new(vec![vocab_size, hidden_size]),
+            generate_synthetic_weights(vocab_size * hidden_size, 0.03),
+        ),
     );
 
     // 2. Compile .pox containers
@@ -313,17 +364,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 3. Evaluation Token Sequences (Natural language sequence emulation)
     let test_prompts: Vec<Vec<u32>> = vec![
-        vec![42, 108, 256, 312, 450, 789, 1204, 1500, 1820, 2100, 2450, 2800],
-        vec![15, 88, 142, 399, 512, 678, 890, 1024, 1340, 1720, 2048, 2300],
+        vec![
+            42, 108, 256, 312, 450, 789, 1204, 1500, 1820, 2100, 2450, 2800,
+        ],
+        vec![
+            15, 88, 142, 399, 512, 678, 890, 1024, 1340, 1720, 2048, 2300,
+        ],
         vec![99, 210, 333, 444, 555, 666, 777, 888, 999, 1111, 1222, 1333],
     ];
 
-    println!("Running Autoregressive Evaluation across {} token sequences...", test_prompts.len());
+    println!(
+        "Running Autoregressive Evaluation across {} token sequences...",
+        test_prompts.len()
+    );
 
     let mut baseline_ppl = 0.0;
     let mut eval_results = Vec::new();
 
-    for (idx, &(display_name, precision_str, ref engine, file_size_mb)) in engines.iter().enumerate() {
+    for (idx, &(display_name, precision_str, ref engine, file_size_mb)) in
+        engines.iter().enumerate()
+    {
         let mut nll_losses = Vec::new();
         let mut kl_divergences = Vec::new();
         let mut top1_matches = 0;
@@ -360,7 +420,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .map(|(i, _)| i as u32)
                     .unwrap_or(0);
 
-                let next_logits = engine.forward_token(next_token, current_pos + step, &mut kv_cache)?;
+                let next_logits =
+                    engine.forward_token(next_token, current_pos + step, &mut kv_cache)?;
                 total_decode_time += decode_start.elapsed().as_secs_f64();
                 total_decode_tokens += 1;
 
@@ -377,8 +438,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 } else {
                     // Compare with FP16 baseline on same token
                     let (_, _, ref fp16_engine, _) = engines[0];
-                    let mut fp16_kv = KvCache::new(num_hidden_layers, num_key_value_heads, head_dim, 256);
-                    let fp16_logits = fp16_engine.forward_token(next_token, current_pos + step, &mut fp16_kv)?;
+                    let mut fp16_kv =
+                        KvCache::new(num_hidden_layers, num_key_value_heads, head_dim, 256);
+                    let fp16_logits =
+                        fp16_engine.forward_token(next_token, current_pos + step, &mut fp16_kv)?;
 
                     let kl = compute_kl_divergence(&fp16_logits, &next_logits);
                     kl_divergences.push(kl);
@@ -450,7 +513,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Cell::new(r.method_name),
             Cell::new(r.precision),
             Cell::new(format!("{:.3}", r.perplexity)).fg(Color::Green),
-            Cell::new(format!("{:+0.3}", r.ppl_delta)).fg(if r.ppl_delta < 0.2 { Color::Green } else { Color::Yellow }),
+            Cell::new(format!("{:+0.3}", r.ppl_delta)).fg(if r.ppl_delta < 0.2 {
+                Color::Green
+            } else {
+                Color::Yellow
+            }),
             Cell::new(format!("{:.4}", r.mean_nll)),
             Cell::new(format!("{:.4e}", r.kl_div)).fg(Color::Magenta),
             Cell::new(format!("{:.1}%", r.top1_agreement_pct)).fg(Color::Green),

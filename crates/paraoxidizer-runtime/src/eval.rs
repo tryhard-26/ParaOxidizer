@@ -6,10 +6,7 @@ pub fn log_sum_exp(logits: &[f32]) -> f64 {
         return 0.0;
     }
     let max_logit = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max) as f64;
-    let sum_exp: f64 = logits
-        .iter()
-        .map(|&l| ((l as f64) - max_logit).exp())
-        .sum();
+    let sum_exp: f64 = logits.iter().map(|&l| ((l as f64) - max_logit).exp()).sum();
     max_logit + sum_exp.ln()
 }
 
@@ -100,7 +97,11 @@ pub fn compute_topk_agreement(base_logits: &[f32], test_logits: &[f32], k: usize
     }
 
     let mut indices: Vec<usize> = (0..len).collect();
-    indices.sort_by(|&a, &b| test_logits[b].partial_cmp(&test_logits[a]).unwrap_or(std::cmp::Ordering::Equal));
+    indices.sort_by(|&a, &b| {
+        test_logits[b]
+            .partial_cmp(&test_logits[a])
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     indices.iter().take(k).any(|&idx| idx == best_base_idx)
 }

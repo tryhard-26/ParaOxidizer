@@ -96,9 +96,9 @@ pub mod macos_metal {
                 return Ok(());
             }
 
-            let num_groups_per_row = (cols + group_size - 1) / group_size;
+            let num_groups_per_row = cols.div_ceil(group_size);
             let req_scale_bytes = rows * num_groups_per_row * 4;
-            let row_packed_bytes = (cols + 1) / 2;
+            let row_packed_bytes = cols.div_ceil(2);
             let req_weight_bytes = rows * row_packed_bytes;
 
             if scale_data.len() < req_scale_bytes || packed_weights.len() < req_weight_bytes {
