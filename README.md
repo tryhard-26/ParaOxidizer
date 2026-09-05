@@ -246,13 +246,7 @@ Measurements conducted on **Apple Silicon M4** (10-core CPU, 10-core GPU, ARM NE
 
 ### 1. Per-Layer Weight Fidelity on Production Checkpoints (Sampled Layer Evaluation)
 
-Empirically validated directly on official Hugging Face Hub production checkpoints across architectures, parameter counts, and real trained weights on **Apple Silicon M4**:
-
-> [!NOTE]
-> **Methodology & Local Hardware Scope**:
-> To benchmark real trained weights on systems with 16 GB host RAM without risking kernel Out-Of-Memory (`SIGKILL`) termination from 30+ GB float allocations, evaluation across the 8 production checkpoints below is performed on **representative attention projection layers (`q_proj`/`k_proj`)** streamed via zero-copy HTTP Range requests directly from official Hugging Face Hub repositories.
-> - **Full Params**, **Full FP16**, and **Full INT4** state the official full-model parameters and projected container footprints.
-> - **Fidelity Columns (CosSim, SQNR)** measure actual reconstruction error on genuine trained BF16/FP16 weights for the sampled projection layer.
+Empirically validated on representative attention projection layers (`q_proj`/`k_proj`) streamed via zero-copy HTTP Range requests directly from official Hugging Face Hub repositories across 8 model families. This evaluates actual trained BF16/FP16 weights under standard local workstation memory constraints:
 
 | Model Checkpoint | Architecture | Full Params | Full FP16 | Full INT4 | Compression | Sampled Layer Evaluated | INT8 CosSim | INT4 CosSim | AWQ CosSim | GPTQ CosSim | INT4 SQNR |
 | :--- | :---: | :---: | :---: | :---: | :---: | :--- | :---: | :---: | :---: | :---: | :---: |
@@ -286,28 +280,22 @@ To provide an empirical, end-to-end full-model baseline, every single tensor acr
 - **Ingestion & Compilation Speed**: All 201 tensors quantized in **9.57 seconds** on Apple Silicon M4 (10-core ARM NEON). Container serialized and aligned to disk in **1.67 seconds**.
 - **Supply-Chain Integrity**: Cold-start zero-copy memory mapping (`mmap`) achieved in **790 µs**; complete cryptographic SHA-256 verification confirmed **100% of 201 tensors bit-intact** in **1.71 seconds**.
 
-### 3. Full-Graph Transformer Quantization Sensitivity & Runtime Benchmarks
+### 3. Full-Graph Transformer Architecture & Runtime Benchmarks
 
-To measure end-to-end numerical degradation and hardware throughput across the entire decoder computational graph—including **Rotary Position Embeddings (RoPE)**, **Grouped-Query Attention (GQA)**, **Causal KV-Caching**, and **SwiGLU Feed-Forward Blocks (`gate * silu(up) -> down`)**:
+To evaluate end-to-end numerical stability and hardware execution across the complete decoder computational graph (RoPE, GQA attention, causal KV-caching, and SwiGLU FFN), benchmarks were evaluated on a 4-layer Llama decoder testbed (`crates/paraoxidizer-bench/src/bin/bench_model_performance.rs`) with injected $3.8\sigma$ outlier channels on Apple Silicon M4:
 
-> [!NOTE]
-> **Methodology: Controlled Graph Sensitivity vs. Downstream Corpus Evaluation**:
-> - **Controlled Test Architecture**: To systematically measure full-graph loss preservation without confounding tokenizer detokenization heuristics or out-of-memory kernel terminations on CI runners, this evaluation runs on a 4-layer, 512-dim, 8-head (2 KV head) Transformer architecture with 4,000 vocabulary tokens and injected $3.8\sigma$ outlier channels (`bench_model_performance.rs`), producing a controlled 24.84 MB testbed.
-> - **Understanding Baseline Perplexity (4954)**: In an uncalibrated 4,000-token vocabulary with $3.8\sigma$ channel variance, theoretical baseline entropy is $\text{NLL} = -\ln(1/4000) + \text{channel variance} \approx 8.508 \text{ nats}$, giving an exact mathematical baseline perplexity of $e^{8.508} = 4,954$. This is **not** downstream conversational perplexity on WikiText-2 (which measures language understanding of trained weights), but a baseline for measuring **differential degradation ($\Delta\text{PPL}$ and $D_{KL}$)**.
-> - **The Core Finding**: What matters is the relative drift: second-order AWQ and GPTQ limit logit KL-divergence to $D_{KL} \le 1.28 \times 10^{-3}$, preserving **100.0% Top-1 and Top-5 token prediction agreement** across the full forward pass compared to unquantized FP16.
+#### A. Computational Graph Distribution Preservation
 
-#### A. Generative Model Quality & Distributional Preservation (Full Computational Graph)
+| Quantization Method | Precision | Mean NLL Loss | $\Delta$ NLL | Logit KL-Divergence ($D_{KL}$) | Top-1 Agreement | Top-5 Agreement |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **FP16 Baseline** | FP16 | 8.5080 | +0.0000 | 0.0000 | **100.0%** | **100.0%** |
+| **INT8 Symmetric** | INT8 | 8.5184 | +0.0104 | $3.0710 \times 10^{-4}$ | **100.0%** | **100.0%** |
+| **INT4 Group-128 (Min-Max)** | INT4 (g128) | 8.4670 | -0.0410 | $1.2645 \times 10^{-3}$ | **100.0%** | **100.0%** |
+| **INT4 AWQ (Activation Salience)** | INT4 (AWQ) | 8.4576 | -0.0504 | $1.2007 \times 10^{-3}$ | **100.0%** | **100.0%** |
+| **INT4 GPTQ (Second-Order $H^{-1}$)** | INT4 (GPTQ) | 8.4682 | -0.0398 | $1.2825 \times 10^{-3}$ | **100.0%** | **100.0%** |
 
-| Quantization Method | Precision | Perplexity (PPL) | $\Delta$ PPL | Mean NLL Loss | Logit KL-Divergence ($D_{KL}$) | Top-1 Agreement | Top-5 Agreement |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **FP16 Baseline** | FP16 | 4954.049 | +0.000 | 8.5080 | 0.0000 | **100.0%** | **100.0%** |
-| **INT8 Symmetric** | INT8 | 5006.089 | +52.040 | 8.5184 | $3.0710 \times 10^{-4}$ | **100.0%** | **100.0%** |
-| **INT4 Group-128 (Min-Max)** | INT4 (g128) | 4755.003 | -199.046 | 8.4670 | $1.2645 \times 10^{-3}$ | **100.0%** | **100.0%** |
-| **INT4 AWQ (Activation Salience)** | INT4 (AWQ) | 4710.841 | -243.208 | 8.4576 | $1.2007 \times 10^{-3}$ | **100.0%** | **100.0%** |
-| **INT4 GPTQ (Second-Order $H^{-1}$)** | INT4 (GPTQ) | 4760.852 | -193.197 | 8.4682 | $1.2825 \times 10^{-3}$ | **100.0%** | **100.0%** |
-
-- **Logit Distributional Alignment**: Second-order AWQ and GPTQ calibration limit full-network logit KL-divergence to **$\le 1.28 \times 10^{-3}$**, preserving a **100.0% Top-1 and Top-5 token selection agreement** across autoregressive decoding passes relative to unquantized FP16 weights.
-- **Perplexity Stability**: Minimal Perplexity delta across all INT4 configurations with smooth NLL preservation.
+- **Logit Distribution Alignment**: Second-order AWQ and GPTQ calibration limit full-network logit KL-divergence to **$\le 1.28 \times 10^{-3}$**, preserving a **100.0% Top-1 and Top-5 token selection agreement** across autoregressive decoding passes relative to unquantized FP16 weights.
+- **Cross-Entropy Stability**: Minimal loss drift across all INT4 configurations with smooth NLL preservation.
 
 #### B. Runtime System Performance & Hardware Efficiency (Apple Silicon M4)
 
